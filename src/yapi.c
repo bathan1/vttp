@@ -1,4 +1,4 @@
-#include "lib/bhop.h"
+#include "lib/stream.h"
 #include "lib/fetch.h"
 #include <asm-generic/errno-base.h>
 #include <pthread.h>
