@@ -6,8 +6,8 @@
 
 int main(void) {
     FILE *jsonfd[2] = {0};
-    if (bhop(jsonfd)) {
-        perror("bhop()");
+    if (stream(jsonfd)) {
+        perror("stream()");
         return 1;
     }
 
@@ -21,7 +21,7 @@ int main(void) {
     char *line = NULL;
     size_t cap = 0;
 
-    printf("Bassoon output:\n");
+    printf("Stream output:\n");
 
     while (getline(&line, &cap, jsonfd[1]) != -1) {
         printf("%s", line);   // already includes '\n'

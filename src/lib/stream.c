@@ -12,7 +12,7 @@
 #define peek(cur, field) (cur->field[cur->current_depth - 1])
 #define push(cur, field, value) ((cur->field[cur->current_depth]) = value)
 
-struct bassoon_state {
+struct stream_state {
     yajl_handle parser;
     unsigned int current_depth;
     unsigned int depth;
@@ -34,20 +34,20 @@ struct bassoon_state {
 /** YAJL parser callbacks */
 static yajl_callbacks callbacks;
 /** Close write end @ COOKIE. */
-static ssize_t bhop_fwrite(void *cookie, const char *buf, size_t size);
+static ssize_t stream_fwrite(void *cookie, const char *buf, size_t size);
 /** Close read end @ COOKIE. */
-static ssize_t bhop_fread(void *cookie, char *buf, size_t size);
-static int bhop_fclosew(void *cookie);
-static int bhop_fcloser(void *cookie);
+static ssize_t stream_fread(void *cookie, char *buf, size_t size);
+static int stream_fclosew(void *cookie);
+static int stream_fcloser(void *cookie);
 
 /** Initialize bassoon state on the heap and get back that pointer. */
-static struct bassoon_state *use_state();
-static void free_state(struct bassoon_state *w_bassoon);
+static struct stream_state *use_state();
+static void free_state(struct stream_state *w_bassoon);
 
-FILE *bhop_readable(struct deque8 *init) {
+FILE *stream_readable(struct deque8 *init) {
     cookie_io_functions_t io = {
-        .read  = bhop_fread,
-        .close = bhop_fcloser,
+        .read  = stream_fread,
+        .close = stream_fcloser,
         .write = NULL,
         .seek  = NULL,
     };
@@ -55,8 +55,8 @@ FILE *bhop_readable(struct deque8 *init) {
     return fopencookie(init, "r", io);
 }
 
-FILE *bhop_writable(struct deque8 *init) {
-    struct bassoon_state *w_bassoon = use_state();
+FILE *stream_writable(struct deque8 *init) {
+    struct stream_state *w_bassoon = use_state();
     if (!w_bassoon) {
         perror("use_state");
         return NULL;
@@ -70,8 +70,8 @@ FILE *bhop_writable(struct deque8 *init) {
     }
 
     cookie_io_functions_t io = {
-        .write = bhop_fwrite,
-        .close = bhop_fclosew,
+        .write = stream_fwrite,
+        .close = stream_fclosew,
         .read  = NULL,
         .seek  = NULL,
     };
@@ -80,14 +80,14 @@ FILE *bhop_writable(struct deque8 *init) {
 }
 
 /* BEGIN STATIC */
-static ssize_t bhop_fwrite(void *cookie, const char *buf, size_t size) {
-    struct bassoon_state *c = cookie;
+static ssize_t stream_fwrite(void *cookie, const char *buf, size_t size) {
+    struct stream_state *c = cookie;
     yajl_parse(c->parser, (const unsigned char *)buf, size);
     return size;
 }
 
-static int bhop_fclosew(void *cookie) {
-    struct bassoon_state *cc = (void *) cookie;
+static int stream_fclosew(void *cookie) {
+    struct stream_state *cc = (void *) cookie;
     if (!cc) {
         return 1;
     }
@@ -103,7 +103,7 @@ static int bhop_fclosew(void *cookie) {
     return 0;
 }
 
-static ssize_t bhop_fread(void *cookie, char *buf, size_t size) {
+static ssize_t stream_fread(void *cookie, char *buf, size_t size) {
     struct deque8 *c = cookie;
     char *json = deque8_pop(c);
     if (!json)
@@ -128,7 +128,7 @@ static ssize_t bhop_fread(void *cookie, char *buf, size_t size) {
     return out_len;
 }
 
-static int bhop_fcloser(void *cookie) {
+static int stream_fcloser(void *cookie) {
     struct deque8 *queue = (void *) cookie;
     if (!queue) { return 1; }
     deque8_free(queue);
@@ -136,7 +136,7 @@ static int bhop_fcloser(void *cookie) {
 }
 
 static int handle_null(void *ctx) {
-    struct bassoon_state *state = ctx;
+    struct stream_state *state = ctx;
     if (state->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
@@ -150,7 +150,7 @@ static int handle_null(void *ctx) {
 }
 
 static int handle_bool(void *ctx, int b) {
-    struct bassoon_state *state = ctx;
+    struct stream_state *state = ctx;
     if (state->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
@@ -177,7 +177,7 @@ static int handle_double(void *ctx, double d) {
 }
 
 static int handle_number(void *ctx, const char *num, size_t len) {
-    struct bassoon_state *cur = ctx;
+    struct stream_state *cur = ctx;
     if (cur->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
@@ -220,7 +220,7 @@ static int handle_number(void *ctx, const char *num, size_t len) {
 static int handle_string(void *ctx,
                          const unsigned char *str, size_t len)
 {
-    struct bassoon_state *cur = ctx;
+    struct stream_state *cur = ctx;
 
     if (cur->current_depth == 0 || !peek(cur, key) || !peek(cur, object)) {
         return 0;
@@ -238,7 +238,7 @@ static int handle_string(void *ctx,
 }
 
 static int handle_start_map(void *ctx) {
-    struct bassoon_state *cur = ctx;
+    struct stream_state *cur = ctx;
     if (cur->current_depth == 0) {
         yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
         yyjson_mut_val *obj = yyjson_mut_obj(doc);
@@ -266,7 +266,7 @@ static int handle_map_key(void *ctx,
                           const unsigned char *str,
                           size_t len)
 {
-    struct bassoon_state *cur = ctx;
+    struct stream_state *cur = ctx;
     if (cur->keys_size >= cur->keys_cap) {
         // double
         cur->keys_cap *= 2;
@@ -282,7 +282,7 @@ static int handle_map_key(void *ctx,
 }
 
 static int handle_end_map(void *ctx) {
-    struct bassoon_state *cur = ctx;
+    struct stream_state *cur = ctx;
     if (cur->current_depth == 1) {
         // closing root object because root object set depth to 1,
         // so that any nested object child can recursively push its own
@@ -341,8 +341,8 @@ static yajl_callbacks callbacks = {
     .yajl_end_array   = handle_end_array
 };
 
-static struct bassoon_state *use_state(void) {
-    struct bassoon_state *st = calloc(1, sizeof(struct bassoon_state));
+static struct stream_state *use_state(void) {
+    struct stream_state *st = calloc(1, sizeof(struct stream_state));
     if (!st) return perror_rc(NULL, "calloc()", 0);
 
     st->keys_cap = 1 << 8;     // 256
@@ -352,13 +352,13 @@ static struct bassoon_state *use_state(void) {
     }
 
     // IMPORTANT: do NOT allocate st->queue here.
-    // It must be set by bhop_writable() to point to caller's queue.
+    // It must be set by stream_writable() to point to caller's queue.
     st->queue = NULL;
 
     return st;
 }
 
-static void free_state(struct bassoon_state *st) {
+static void free_state(struct stream_state *st) {
     if (!st) return;
 
     // Don't free st->queue here — it's not owned by the state!

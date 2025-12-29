@@ -4,8 +4,8 @@
  *
  * Helper functions #yarts.c has available.
  *
- * @example bhop_print.c
- * `gcc bhop_print.c -lyarts -o bhop_print`
+ * @example stream_print.c
+ * `gcc stream_print.c -lyarts -o stream_print`
  *
  * @example fetch_print.c
  * `gcc fetch_print.c -lyarts -o fetch_print`
@@ -27,15 +27,15 @@ static const char *FRAME_NDJSON = 0;
 /**
  * @brief Make FILES[1] write to readable FILES[0].
  *
- * Buffer Handle Open Pipe, or #bhop(), opens a unidirectional
- * pipe where you write into `FILES[0]` and read from `FILES[1]`,
- * just like posix pipes.
+ * Opens a unidirectional pipe where you write into `FILES[0]` and 
+ * read from `FILES[1]`, just like posix pipes but with in-memory FILE
+ * handles.
  *
  * @retval  0  Success. `FILES[0]` and `FILES[1]` are fully initialized.
  * @retval -1  Error. `FILES` is left unchanged and errno is set.
  *
  * ### Example with manual JSON
- * @snippet bhop_print.c bhop basic usage
+ * @snippet stream_print.c Stream basic usage
  */
 int stream(FILE *files[2]);
 

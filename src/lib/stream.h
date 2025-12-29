@@ -1,6 +1,6 @@
 /**
- * @file bhop.h
- * @brief Buffer Handle Open Pipe
+ * @file stream.h
+ * @brief In memory streams
  *
  * In memory stream that implements FIFO over a #deque
  */
@@ -11,9 +11,9 @@
 /**
  * @brief Returns a readable FILE handle bound to DEQUE.
  */
-FILE *bhop_readable(struct deque8 *deque);
+FILE *stream_readable(struct deque8 *deque);
 
 /**
  * @brief Returns a writable FILE handle bound to DEQUE.
  */
-FILE *bhop_writable(struct deque8 *deque);
+FILE *stream_writable(struct deque8 *deque);
