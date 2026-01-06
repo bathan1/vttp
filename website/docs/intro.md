@@ -61,7 +61,8 @@ endpoint in `SELECT ... WHERE ...` query:
 SELECT * FROM todos WHERE url = 'https://jsonplaceholder.typicode.com/todos' LIMIT 5;
 ```
 
-```bash
+```sql
+sqlite> SELECT * FROM todos WHERE url = 'https://jsonplaceholder.typicode.com/todos' LIMIT 5;
 ┌────┬────────┬──────────────────────────────────────────────────────────────┬───────────┐
 │ id │ userId │                            title                             │ completed │
 ├────┼────────┼──────────────────────────────────────────────────────────────┼───────────┤
@@ -85,7 +86,9 @@ SELECT * FROM todos WHERE url = 'https://jsonplaceholder.typicode.com/todos'
 AND completed = 'true' LIMIT 5;
 ```
 
-```bash
+```sql
+sqlite> SELECT * FROM todos WHERE url = 'https://jsonplaceholder.typicode.com/todos'
+        AND completed = 'true' LIMIT 5;
 ┌────┬────────┬──────────────────────────────────────────────┬───────────┐
 │ id │ userId │                    title                     │ completed │
 ├────┼────────┼──────────────────────────────────────────────┼───────────┤
@@ -110,7 +113,8 @@ CREATE VIRTUAL TABLE todos USING vttp (
 SELECT * FROM todos WHERE url = 'https://jsonplaceholder.typicode.com/todos' LIMIT 5;
 ```
 
-```bash
+```sql
+sqlite> SELECT * FROM todos WHERE url = 'https://jsonplaceholder.typicode.com/todos' LIMIT 5;
 ┌────┬──────────────────────────────────────────────────────────────┐
 │ id │                            title                             │
 ├────┼──────────────────────────────────────────────────────────────┤

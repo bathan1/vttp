@@ -56,7 +56,9 @@ CREATE VIRTUAL TABLE albums USING vttp (
 
 And not saying you should do this, but you *could* mismatch the types...
 
-```sql {2-4}
+```sql {4-6,13}
+DROP TABLE IF EXISTS albums;
+
 CREATE VIRTUAL TABLE albums USING vttp (
     url INT,
     headers FLOAT,
@@ -65,9 +67,26 @@ CREATE VIRTUAL TABLE albums USING vttp (
     "userId" INT,
     title TEXT
 );
+
+SELECT * FROM albums
+WHERE url = 'https://jsonplaceholder.typicode.com/albums' -- url is still TEXT!
+LIMIT 3;
 ```
 
-... and VTTP would simply ignore the bad types.
+... and VTTP will simply ignore the bad types.
+
+```sql
+sqlite> SELECT * FROM albums
+        WHERE url = 'https://jsonplaceholder.typicode.com/albums'
+        LIMIT 3;
+┌────┬────────┬──────────────────────────────────┐
+│ id │ userId │              title               │
+├────┼────────┼──────────────────────────────────┤
+│ 1  │ 1      │ quidem molestiae enim            │
+│ 2  │ 1      │ sunt qui excepturi placeat culpa │
+│ 3  │ 1      │ omnis laborum odio               │
+└────┴────────┴──────────────────────────────────┘
+```
 
 As mentioned above, only constraints on the hidden columns are evaluated by the VTTP virtual table module,
 which we'll go over here.
@@ -121,23 +140,57 @@ sqlite> SELECT * FROM albums LIMIT 3;
 ```
 
 If you set a `DEFAULT` value *and* specify a `url` in a `WHERE` clause, the `WHERE url = ...`
-value will be used over the default
+value will be used over the default:
 
-```sql {3}
+```sql {4,12}
 DROP TABLE IF EXISTS todos;
 
 CREATE VIRTUAL TABLE todos USING vttp (
-    url text default 'https://jsonplaceholder.typicode.com/todos',
-    "userId" int,
-    id int,
-    title text,
-    completed text
+    url TEXT default 'https://jsonplaceholder.typicode.com/todos',
+    "userId" INT,
+    id INT,
+    title TEXT,
+    completed TEXT
 );
 
 SELECT * FROM todos
 WHERE url = 'https://dummy-json.mock.beeceptor.com/todos';
 ```
 
+This will select the todos from the https://dummy-json.mock.beeceptor.com/todos url instead
+of the `DEFAULT` typicode api:
+
+```sql
+sqlite> SELECT * FROM todos 
+        WHERE url = 'https://dummy-json.mock.beeceptor.com/todos';
+┌────────┬────┬──────────────────┬───────────┐
+│ userId │ id │      title       │ completed │
+├────────┼────┼──────────────────┼───────────┤
+│ 3      │ 1  │ Buy groceries    │ false     │
+│ 5      │ 2  │ Go for a walk    │ true      │
+│ 1      │ 3  │ Finish homework  │ false     │
+│ 7      │ 4  │ Read a book      │ true      │
+│ 2      │ 5  │ Pay bills        │ false     │
+│ 4      │ 6  │ Call a friend    │ true      │
+│ 6      │ 7  │ Clean the house  │ false     │
+│ 9      │ 8  │ Go to the gym    │ true      │
+│ 8      │ 9  │ Write a report   │ false     │
+│ 2      │ 10 │ Cook dinner      │ true      │
+│ 1      │ 11 │ Study for exams  │ false     │
+│ 3      │ 12 │ Do laundry       │ true      │
+│ 5      │ 13 │ Practice guitar  │ false     │
+│ 7      │ 14 │ Plan a trip      │ true      │
+│ 9      │ 15 │ Attend a meeting │ false     │
+│ 6      │ 16 │ Water the plants │ true      │
+│ 4      │ 17 │ Fix the car      │ false     │
+│ 8      │ 18 │ Watch a movie    │ true      │
+│ 10     │ 19 │ Visit the museum │ false     │
+│ 1      │ 20 │ Send an email    │ true      │
+└────────┴────┴──────────────────┴───────────┘
+```
+
 ## Headers
+TODO
 
 ## Body
+TODO

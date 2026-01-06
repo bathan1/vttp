@@ -330,16 +330,9 @@ static void handle_http_body_bytes(struct fetch_state *st,
 
             /* 2. READ CHUNK PAYLOAD */
             if (!st->reading_chunk_size && st->current_chunk_size > 0) {
-                size_t available = len - i;
-                size_t need = st->current_chunk_size;
-
-                size_t to_copy = (available < need) ? available : need;
-
-                // Feed payload bytes to body stream write end
-                fwrite(data + i, 1, to_copy, st->stream[0]);
-
-                i += to_copy;
-                st->current_chunk_size -= to_copy;
+                size_t written = fwrite8(data + i, len - i, st->current_chunk_size, st->stream[0]);
+                i += written;
+                st->current_chunk_size -= written;
 
                 // If not enough bytes to finish payload, exit now
                 if (st->current_chunk_size > 0) {
