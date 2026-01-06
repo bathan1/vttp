@@ -20,6 +20,8 @@ Test(ss, shallow_copy_buffer) {
         heap_greeting,
         "ss() should shallow copy heap pointer"
     );
+
+    free(heap_string.hd);
 }
 
 Test(ss, length_copy) {
