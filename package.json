@@ -1,5 +1,5 @@
 {
-    "name": "vhs",
+    "name": "vttp",
     "version": "0.9.8",
     "type": "module",
     "description": "An HTTP Virtual Table extension for SQLite",

@@ -4,7 +4,7 @@ MAKEFLAGS += -rR
 
 # ---- Names ----
 API_EXT     := vapi
-SQLITE_EXT  := vhs
+SQLITE_EXT  := vttp
 
 API_TARGET     := lib$(API_EXT).so
 SQLITE_TARGET  := lib$(SQLITE_EXT).so
@@ -16,7 +16,7 @@ SRC_COMMON := \
     src/lib/cfns.c src/lib/tcp.c src/lib/sql.c
 
 SRC_SQLITE := \
-    src/vhs.c
+    src/vttp.c
 
 OBJ_COMMON  := $(SRC_COMMON:.c=.o)
 OBJ_SQLITE  := $(SRC_SQLITE:.c=.o)

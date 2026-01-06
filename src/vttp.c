@@ -77,7 +77,7 @@ yyjson_doc *read_next_json_object(FILE *stream, char **errmsg) {
     ssize_t n = getline(&buf, &cap, stream);
     if (n == -1) {
         if (errmsg) {
-            *errmsg = sqlite3_mprintf("(yarts) no body stream");
+            *errmsg = sqlite3_mprintf("(vhs) no body stream");
         }
         free(buf);
         return NULL;
@@ -93,7 +93,7 @@ yyjson_doc *read_next_json_object(FILE *stream, char **errmsg) {
     yyjson_doc *doc = yyjson_read(buf, n, 0);
     if (!doc) {
         if (errmsg) {
-            *errmsg = sqlite3_mprintf("(yarts) invalid json object");
+            *errmsg = sqlite3_mprintf("(vhs) invalid json object");
         }
         free(buf);
         return NULL;
@@ -539,10 +539,10 @@ static sqlite3_module fetch_vtab_module = {
 };
 
 // Runtime loadable entry
-int sqlite3_vhs_init(sqlite3 *db, char **pzErrMsg,
+int sqlite3_vttp_init(sqlite3 *db, char **pzErrMsg,
                        const sqlite3_api_routines *pApi) {
     SQLITE_EXTENSION_INIT2(pApi);
     // oh yeah baby
-    int rc = sqlite3_create_module(db, "vhs", &fetch_vtab_module, 0);
+    int rc = sqlite3_create_module(db, "vttp", &fetch_vtab_module, 0);
     return rc;
 }

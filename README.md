@@ -1,4 +1,4 @@
-# VHS
+# vttp
 An HTTP backed virtual table for SQLite.
 
 | OS      | Arch  | Tested |

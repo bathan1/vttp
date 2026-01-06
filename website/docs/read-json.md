@@ -37,7 +37,7 @@ Here's what a todo from the [typicode api](https://jsonplaceholder.typicode.com/
 }
 ```
 
-To *read* a todo JSON as a SQL row, we have to tell the `vhs` virtual table
+To *read* a todo JSON as a SQL row, we have to tell the `vttp` virtual table
 factory what SQL types we need converted from the JSON types.
 
 ## Easy Column Maps
@@ -71,7 +71,7 @@ If you choose to save `completed` columns as `TEXT`:
 ```sql title="todos_text.sql"
 DROP TABLE IF EXISTS todos;
 
-CREATE VIRTUAL TABLE todos USING vhs (
+CREATE VIRTUAL TABLE todos USING vttp (
     url TEXT DEFAULT 'https://jsonplaceholder.typicode.com/todos',
     id INT,
     "userId" INT,
@@ -106,7 +106,7 @@ Boolean maps to `INT`s follow the standard C style bools where...
 ```sql title="todos_int.sql"
 DROP TABLE IF EXISTS todos;
 
-CREATE VIRTUAL TABLE todos USING vhs (
+CREATE VIRTUAL TABLE todos USING vttp (
     url TEXT DEFAULT 'https://jsonplaceholder.typicode.com/todos',
     id INT,
     "userId" INT,
@@ -144,7 +144,7 @@ For example, the `address` and `company` fields from the typicode API is a JSON 
 so we declare their types as `TEXT`:
 
 ```sql
-CREATE VIRTUAL TABLE users USING vhs (
+CREATE VIRTUAL TABLE users USING vttp (
     url TEXT DEFAULT 'https://jsonplaceholder.typicode.com/users',
     id INT,
     name TEXT,
@@ -191,7 +191,7 @@ in conjunction with the `->` JSON path traversal (Postgres style):
 ```sql
 DROP TABLE IF EXISTS users;
 
-CREATE VIRTUAL TABLE users USING vhs (
+CREATE VIRTUAL TABLE users USING vttp (
     url TEXT DEFAULT 'https://jsonplaceholder.typicode.com/users',
     id INT,
     name TEXT,
@@ -226,7 +226,7 @@ For example, the FHIR API specs always return a single [Bundle](https://hl7.org/
 its resources. So attempting to create this `patients` table...
 
 ```sql
-CREATE VIRTUAL TABLE patients USING vhs (
+CREATE VIRTUAL TABLE patients USING vttp (
     url TEXT DEFAULT 'https://r4.smarthealthit.org/Patient',
     "resourceType" TEXT,
     id TEXT

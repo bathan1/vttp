@@ -2,13 +2,13 @@
  * @file vapi.h
  * @brief Yet Another Runtime TCP Stream internal functions API
  *
- * Helper functions #yarts.c has available.
+ * Helper functions #vhs.c has available.
  *
  * @example stream_print.c
- * `gcc stream_print.c -lyarts -o stream_print`
+ * `gcc stream_print.c -lvapi -o stream_print`
  *
  * @example fetch_print.c
- * `gcc fetch_print.c -lyarts -o fetch_print`
+ * `gcc fetch_print.c -lvapi -o fetch_print`
  */
 #pragma once
 #include <stdio.h>
@@ -26,7 +26,7 @@
  * ### Example with manual JSON
  * @snippet stream_print.c Stream basic usage
  */
-int stream(FILE *files[2]);
+int streamify(FILE *files[2]);
 
 /**
  * @brief \c send() HTTP Request over a TCP socket, wrapping the response socket over

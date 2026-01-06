@@ -1,6 +1,6 @@
-.load ./libvhs
+.load ./libvttp
 .mode box
-create virtual table todos using vhs (
+create virtual table todos using vttp (
     url text default 'https://jsonplaceholder.typicode.com/todos',
     id int,
     "userId" int,
@@ -9,7 +9,7 @@ create virtual table todos using vhs (
 );
 select * from todos limit 5;
 
-CREATE VIRTUAL TABLE users USING vhs (
+CREATE VIRTUAL TABLE users USING vttp (
     url TEXT DEFAULT 'https://jsonplaceholder.typicode.com/users',
     id INT,
     name TEXT,

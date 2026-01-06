@@ -3,10 +3,9 @@ sidebar_position: 1
 ---
 
 # Introduction
-*Virtual HTTP SQL*, or *vhs* for short, is an SQLite runtime extension that
-provides an HTTP-backed virtual table.
+*vttp* is an SQLite runtime extension that provides an HTTP-backed virtual table.
 
-Let's discover **vhs in less than 5 minutes**.
+Let's discover **vttp in less than 5 minutes**.
 
 ## Getting Started
 
@@ -22,14 +21,14 @@ Install the extension from the Github releases page and open SQLite.
 The default release is Linux x86_64:
 
 ```bash
-curl -LO https://github.com/bathan1/vhs/releases/latest/download/libvhs.so
+curl -LO https://github.com/bathan1/vttp/releases/latest/download/libvttp.so
 sqlite3
 ```
 
 Load the extension:
 
 ```sql
-.load ./libvhs
+.load ./libvttp
 ```
 
 Optionally format the cli:
@@ -38,13 +37,13 @@ Optionally format the cli:
 .mode box
 ```
 
-You have now linked the `vhs` virtual table library with SQLite.
+You have now linked the `vttp` virtual table library with SQLite.
 
 ## Write your Queries
-Create a Virtual Table by declaring your expected payload shape with the `vhs` virtual table:
+Create a Virtual Table by declaring your expected payload shape with the `vttp` virtual table:
 
 ```sql
-CREATE VIRTUAL TABLE todos USING vhs (
+CREATE VIRTUAL TABLE todos USING vttp (
     id INT,
     "userId" INT,
     title TEXT,
@@ -52,7 +51,7 @@ CREATE VIRTUAL TABLE todos USING vhs (
 );
 ```
 
-The `vhs` module will include a `url HIDDEN TEXT` column into your virtual table, which specifies the url 
+The `vttp` module will include a `url HIDDEN TEXT` column into your virtual table, which specifies the url 
 to send the http request to.
 
 To fetch `todos` from a json dummy api, for example, we set `url` equal to the 
@@ -103,7 +102,7 @@ If you only cared about the `id` and `title` fields, just include those columns 
 ```sql
 DROP TABLE IF EXISTS todos;
 
-CREATE VIRTUAL TABLE todos USING vhs (
+CREATE VIRTUAL TABLE todos USING vttp (
     id INT,
     title TEXT
 );
@@ -148,7 +147,7 @@ for the `url` column in the `create virtual table` statement:
 ```sql
 DROP TABLE IF EXISTS todos;
 
-CREATE VIRTUAL TABLE todos USING vhs (
+CREATE VIRTUAL TABLE todos USING vttp (
     url TEXT DEFAULT 'https://jsonplaceholder.typicode.com/todos',
     id INT,
     title TEXT
@@ -163,4 +162,4 @@ SELECT * FROM todos LIMIT 5;
 ```
 
 In general, you *should* set a default URL if you know that you're
-only pinging 1 endpoint per `vhs` virtual table.
+only pinging 1 endpoint per `vttp` virtual table.
