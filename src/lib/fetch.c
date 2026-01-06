@@ -72,15 +72,8 @@ static int set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0;
 }
+
 int use_fetch(int fds[4], struct dispatch *dispatch) {
-    // if (connect(dispatch->sockfd, dispatch->addrinfo->ai_addr, dispatch->addrinfo->ai_addrlen) < 0) {
-    //     return perror_rc(-1, "connect()", close(dispatch->sockfd), dispatch_free(dispatch));
-    // }
-    // if (is_tls) {
-    //     if (tls_connect(&dispatch->ssl, dispatch->sockfd, &dispatch->ctx, str(dispatch->url.hostname))) {
-    //         return perror_rc(-1, "tls_connect()", close(dispatch->sockfd), dispatch_free(dispatch));
-    //     } // else { ok! }
-    // }
     bool is_tls = strncmp(dispatch->url.protocol.hd, "https:", 6) == 0;
     SSL **ssl = is_tls ? &dispatch->ssl : NULL;
     SSL_CTX **ctx = is_tls ? &dispatch->ctx : NULL;
@@ -116,12 +109,6 @@ int use_fetch(int fds[4], struct dispatch *dispatch) {
         return perror_rc(-1, "ttcp_send()", GET.hd, close(dispatch->sockfd), dispatch_free(dispatch));
     }
 
-    // if (send_maybe_tls(dispatch->ssl, dispatch->sockfd, str(GET), len(GET)) < 0) {
-    //     if (errno != EAGAIN) {
-    //         return perror_rc(-1, "send_maybe_tls()", free(GET), close(dispatch->sockfd), dispatch_free(dispatch));
-    //     }
-    //     // TODO?
-    // }
     free(GET.hd);
 
     int sv[2] = {0};
@@ -158,7 +145,7 @@ static void handle_http_body_bytes(struct fetch_state *st,
 static void handle_http_body(struct fetch_state *st);
 
 static bool flush_pending(struct fetch_state *st);
-static void flush_streamoon(struct fetch_state *st);
+static void flush_stream(struct fetch_state *st);
 
 void *fetcher(void *arg) {
     struct fetch_state *fs = arg;
@@ -192,7 +179,7 @@ void *fetcher(void *arg) {
     fs->stream[0] = NULL;
 
     /* There may still be unflushed parsed objects */
-    flush_streamoon(fs);
+    flush_stream(fs);
 
     fclose(fs->stream[1]);
     fs->stream[1] = NULL;
@@ -509,7 +496,7 @@ static bool flush_pending(struct fetch_state *st) {
     return true; // pending fully flushed
 }
 
-static void flush_streamoon(struct fetch_state *st) {
+static void flush_stream(struct fetch_state *st) {
     FILE *rd = st->stream[1];
     int out = st->outfd;
 

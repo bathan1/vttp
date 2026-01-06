@@ -6,14 +6,14 @@
  */
 #pragma once
 #include <stdio.h>
-#include "deque.h"
+#include "cfns.h"
 
 /**
  * @brief Returns a readable FILE handle bound to DEQUE.
  */
-FILE *stream_readable(struct deque8 *deque);
+FILE *rstream(struct deque8 *deque);
 
 /**
  * @brief Returns a writable FILE handle bound to DEQUE.
  */
-FILE *stream_writable(struct deque8 *deque);
+FILE *wstream(struct deque8 *deque);

@@ -3,7 +3,6 @@
 #include <yyjson.h>
 #include <yajl/yajl_parse.h>
 
-#include "deque.h"
 #include "cfns.h"
 
 /** Fixed number of JSON object levels to traverse before returning. */
@@ -44,7 +43,7 @@ static int stream_fcloser(void *cookie);
 static struct stream_state *use_state();
 static void free_state(struct stream_state *w_bassoon);
 
-FILE *stream_readable(struct deque8 *init) {
+FILE *rstream(struct deque8 *init) {
     cookie_io_functions_t io = {
         .read  = stream_fread,
         .close = stream_fcloser,
@@ -55,7 +54,7 @@ FILE *stream_readable(struct deque8 *init) {
     return fopencookie(init, "r", io);
 }
 
-FILE *stream_writable(struct deque8 *init) {
+FILE *wstream(struct deque8 *init) {
     struct stream_state *w_bassoon = use_state();
     if (!w_bassoon) {
         perror("use_state");

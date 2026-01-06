@@ -86,7 +86,7 @@ yyjson_doc *read_next_json_object(FILE *stream, char **errmsg) {
     ssize_t n = getline(&buf, &cap, stream);
     if (n == -1) {
         if (errmsg) {
-            *errmsg = sqlite3_mprintf("fetch: no body");
+            *errmsg = sqlite3_mprintf("(yarts) no body stream");
         }
         free(buf);
         return NULL;
@@ -102,7 +102,7 @@ yyjson_doc *read_next_json_object(FILE *stream, char **errmsg) {
     yyjson_doc *doc = yyjson_read(buf, n, 0);
     if (!doc) {
         if (errmsg) {
-            *errmsg = sqlite3_mprintf("fetch: invalid json object");
+            *errmsg = sqlite3_mprintf("(yarts) invalid json object");
         }
         free(buf);
         return NULL;

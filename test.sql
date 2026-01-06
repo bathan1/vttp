@@ -7,4 +7,4 @@ create virtual table todos using fetch (
     title text,
     completed text
 );
-select * from todos;
+select * from todos limit 5;

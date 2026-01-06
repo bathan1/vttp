@@ -14,13 +14,13 @@ int stream(FILE *files[2]) {
     }
     deque8_init(dq);
 
-    FILE *writable = stream_writable(dq);
+    FILE *writable = wstream(dq);
     if (!writable) {
-        return perror_rc(-1, "bhop_writable", deque8_free(dq));
+        return perror_rc(-1, "wstream", deque8_free(dq));
     }
-    FILE *readable = stream_readable(dq);
+    FILE *readable = rstream(dq);
     if (!readable) {
-        return perror_rc(-1, "bhop_readable", fclose(writable), deque8_free(dq));
+        return perror_rc(-1, "rstream", fclose(writable), deque8_free(dq));
     }
 
     files[0] = writable;
