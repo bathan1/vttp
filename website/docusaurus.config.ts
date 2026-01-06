@@ -43,7 +43,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl: 'https://github.com/bathan1/yarts'
+          editUrl: 'https://github.com/bathan1/vttp'
         },
         blog: {
           showReadingTime: true,
@@ -53,7 +53,7 @@ const config: Config = {
           },
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl: 'https://github.com/bathan1/yarts',
+          editUrl: 'https://github.com/bathan1/vttp',
           // Useful options to enforce blogging best practices
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
@@ -73,7 +73,7 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'yarts',
+      title: 'vttp',
       logo: {
         alt: 'My Site Logo',
         src: 'img/logo.svg',
@@ -86,9 +86,9 @@ const config: Config = {
           label: 'Tutorial',
         },
         {to: '/blog', label: 'Blog', position: 'left'},
-        {href: "https://bathan1.github.io/yarts/index.html", label: "API reference", position: "left"},
+        {href: "https://bathan1.github.io/vttp/index.html", label: "API reference", position: "left"},
         {
-          href: "https://github.com/bathan1/yarts",
+          href: "https://github.com/bathan1/vttp",
           label: 'GitHub',
           position: 'right',
         }
@@ -132,7 +132,7 @@ const config: Config = {
             },
             {
               label: 'GitHub',
-              href: 'https://github.com/bathan1/yarts',
+              href: 'https://github.com/bathan1/vttp',
             },
           ],
         },

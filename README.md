@@ -32,7 +32,7 @@ mkdir build && cd build && cmake ..
 sudo make install
 ```
 
-Then `cd` back into the root and run to build the extension file `libyarts.so`:
+Then `cd` back into the root and run to build the extension file `libvttp.so`:
 
 ```bash
 make
