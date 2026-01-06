@@ -290,16 +290,18 @@ static void handle_http_body_bytes(struct fetch_state *st,
     size_t i = 0;
 
     if (!st->chunked_mode && st->content_length > 0) {
-        while (i < len) {
-            // then server gave us content-length
-            size_t available = len - i;
-            size_t to_copy = (available < st->content_length) ? available : st->content_length;
+        // Then server gave us content-length
+        size_t available = len - i;
+        size_t to_copy = (available < st->content_length) ? available : st->content_length;
 
-            // Feed payload bytes to body stream write end
-            fwrite(data + i, 1, to_copy, st->stream[0]);
-
-            i += to_copy;
+        // Feed payload bytes to body stream write end
+        size_t written = fwrite(data + i, 1, to_copy, st->stream[0]);
+        if (written == 0 && ferror(st->stream[0])) {
+            // TODO: handle pipe error
         }
+
+        i += written;
+        st->content_length -= written;
     } else {
         while (i < len) {
             if (st->reading_chunk_size) {
