@@ -221,16 +221,12 @@ static Fetch *init_fetch_vtab(sqlite3 *db, int argc,
         *schema = sqlite3_str_finish(s);
     }
     free(first_line.hd);
-
-    println("schema: %s", schema);
-
     return vtab;
 }
 
 static int xConnect(sqlite3 *pdb, void *paux, int argc,
                      const char *const *argv, sqlite3_vtab **pp_vtab,
                      char **pz_err) {
-    println("xConnect begin, argc = %d\n", argc);
     if (argc < MIN_ARGC) {
         fprintf(stderr, "Expected %d args but got %d args\n", MIN_ARGC, argc);
         return SQLITE_ERROR;
@@ -244,7 +240,13 @@ static int xConnect(sqlite3 *pdb, void *paux, int argc,
     }
 
     rc += sqlite3_declare_vtab(pdb, schema);
-    println("xConnect end for table:\n%s\n", schema);
+    sqlite3_free(schema);
+
+    {
+        println("(xConnect) schema is\n%s", schema);
+        println("(xConnect) OK");
+    }
+
     return rc;
 }
 

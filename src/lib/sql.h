@@ -16,8 +16,6 @@ struct column_def {
     size_t generated_always_as_len;
 };
 
-struct column_def **column_defs_from_declrs(int argc, const char *const *argv, size_t *num_columns);
-
 /**
  * Allocate the #column_def from user ARGC and ARGV, optionally writing out the number
  * resolved columns to NUM_COLUMNS if it isn't NULL.

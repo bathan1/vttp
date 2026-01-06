@@ -281,6 +281,7 @@ struct column_def *resolve_hidden_columns(int argc, const char *const *argv) {
             &num_tokens
         );
 
+        // handle a default url value
         if (tokens[0].length == 3 
             && strncmp(tokens[0].hd, "url", 3) == 0
             && num_tokens == 4
@@ -334,14 +335,30 @@ struct column_def *parse_column_defs(int argc, const char *const *argv,
             &num_tokens
         );
 
-        if (is_hidden_column(tokens[0])) {
+        if (is_hidden_column(tokens[TOK_NAME])) {
             // we already handle this in resolve_hidden_columns()
             continue;
         }
 
-        cols[n_columns].name = tokens[0];
-        cols[n_columns].typename = tokens[1];
+        if (tokens[TOK_NAME].hd[0] == '\"') {
+            if (tokens[TOK_NAME].hd[tokens[TOK_NAME].length - 1] != '\"') {
+                fprintf(stderr, "Open dquote line is missing closing dquote: %s\n", argv[i]);
+                free(tokens);
+                return NULL;
+            }
+            if (rmch(&tokens[TOK_NAME], '\"') != 0) {
+                free(tokens);
+                return perror_rc(NULL, "rmch", 0);
+            }
+        } else {
+            // With no dquotes around the column name, lowercase it like SQLite does
+            lowercase(&tokens[TOK_NAME]);
+        }
+
+        cols[n_columns].name = tokens[TOK_NAME];
+        cols[n_columns].typename = tokens[TOK_TYPE];
         n_columns += 1;
+
     }
 
     if (num_columns) {
