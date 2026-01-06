@@ -3,7 +3,7 @@ sidebar_position: 1
 ---
 
 # Introduction
-*vttp* is an SQLite runtime extension that provides an HTTP-backed virtual table.
+*VTTP* is an SQLite runtime extension that provides an HTTP-backed virtual table.
 
 Let's discover **vttp in less than 5 minutes**.
 

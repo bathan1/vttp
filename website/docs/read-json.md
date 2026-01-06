@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Read JSON
 
-The VHS virtual table was designed to work with JSONs by default.
+The VTTP virtual table was designed to work with JSONs by default.
 
 *From* JSON *to* SQLite, the type conversions are:
 
@@ -57,7 +57,7 @@ id INT,
 title TEXT
 ```
 
-The VHS virtual table works best with numerical / text types
+The VTTP virtual table works best with numerical / text types
 because they have a logical 1-to-1 mapping between JSON and SQL.
 
 ## Booleans
@@ -137,7 +137,7 @@ SELECT * FROM todos LIMIT 5;
 ```
 
 ## Objects and Arrays
-The last JSON types VHS has to handle are `object` and `array` types,
+The last JSON types VTTP has to handle are `object` and `array` types,
 which it does by simply stringifying the values into `TEXT` columns.
 
 For example, the `address` and `company` fields from the typicode API is a JSON object,
