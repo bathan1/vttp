@@ -57,7 +57,7 @@ pnpm run test
 
 ## Library
 The majority of the code is under `src/lib`, where a select number of functions
-are exposed to the extension `vhs.c` file via the `vapi.h` header.
+are exposed to the extension `vttp.c` file via the `vapi.h` header.
 
 If you've installed the API via the `make install` command, you can use the helper functions
 in standalone code by compiling with the `-lvapi` flag. To compile the queue printer example script:
