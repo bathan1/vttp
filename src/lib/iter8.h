@@ -8,18 +8,28 @@
 /**
  * doubly linked list.
  */
-typedef struct list8 {
-    struct list8 *next;
-    struct list8 *prev;
+typedef struct list list;
+
+struct list {
+    struct list *next;
+    struct list *prev;
     char *buffer;
     size_t length;
-} list8;
+};
 
 /**
- * Go to the next node in the list in NODE, if it exists.
+ * Go to the next node in the list in LS, if it exists.
  */
-struct list8 *__list8_next(struct list8 *node);
-struct list8 *__list8_new(struct list8 init);
+struct list *__list_next(struct list *ls);
+
+/**
+ * Size of the **buffer** in LS, NOT the list length.
+ */
+size_t __list_len(struct list *ls);
+
+const char *__list_peek(struct list *ls);
+
+void __list_done(struct list *ls);
 
 /**
  * @brief Get the next value from ITER.
@@ -27,9 +37,18 @@ struct list8 *__list8_new(struct list8 init);
  * You can also call the `__` prefixed implementation
  * functions directly, so this is really just for typing convenience.
  */
-#define next8(iter) \
+#define next(iter) \
     _Generic((iter), \
-        struct list8 *:  __list8_next \
+        struct list *: __list_next \
     )(iter)
 
-#define List8(...) __list8_new((struct list8){ __VA_ARGS__ })
+#define peek(iter) \
+    _Generic((iter), \
+        struct list *: __list_peek \
+    )(iter)
+
+#define done(iter) \
+    _Generic((iter), \
+        struct list *: __list_done \
+    )(iter)
+

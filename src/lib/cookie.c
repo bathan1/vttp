@@ -10,7 +10,6 @@
 /** Fixed number of JSON object levels to traverse before returning. */
 #define MAX_DEPTH 64
 
-#define peek(cur, field) (cur->field[cur->current_depth > 0 ? cur->current_depth - 1 : 0])
 #define push(cur, field, value) ((cur->field[cur->current_depth]) = value)
 
 struct cookie {
@@ -89,8 +88,8 @@ const struct cookie COOKIE_PASSTHROUGH = {
 
 struct json_writable {
     yajl_handle parser;
-    list8 *path;
-    list8 *path_parent;
+    list *path;
+    list *path_parent;
     unsigned int current_depth;
     struct deque8 *queue;
 
@@ -119,33 +118,37 @@ typedef struct json {
 } json_t;
 
 static int handle_null(void *ctx) {
-    struct json_writable *state = ctx;
-    if (state->current_depth == 0) {
+    struct json_writable *cur = ctx;
+    if (cur->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
     }
-    if (!peek(state, key_stack)) {
-        fprintf(stderr, "no parent key value from depth %u\n", state->current_depth);
+    if (!(cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0])) {
+        fprintf(stderr, "no parent key value from depth %u\n", cur->current_depth);
         return 0;
     }
-    yyjson_mut_obj_add_null(state->doc_root, peek(state, object_stack), peek(state, key_stack));
+    yyjson_mut_obj_add_null(
+        cur->doc_root,
+        cur->object_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
+        cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0]
+    );
     return 1;
 }
 
 static int handle_bool(void *ctx, int b) {
-    struct json_writable *state = ctx;
-    if (state->current_depth == 0) {
+    struct json_writable *cur = ctx;
+    if (cur->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
     }
-    if (!peek(state, key_stack)) {
-        fprintf(stderr, "no parent key value from depth %u\n", state->current_depth);
+    if (!cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0]) {
+        fprintf(stderr, "no parent key value from depth %u\n", cur->current_depth);
         return 0;
     }
     yyjson_mut_obj_add_bool(
-        state->doc_root,
-        peek(state, object_stack),
-        peek(state, key_stack),
+        cur->doc_root,
+        cur->object_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
+        cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
         b
     );
     return 1;
@@ -165,7 +168,7 @@ static int handle_number(void *ctx, const char *num, size_t len) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
     }
-    if (!peek(cur, key_stack)) {
+    if (!cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0]) {
         fprintf(stderr, "no parent key value from depth %u\n", cur->current_depth);
         return 0;
     }
@@ -183,16 +186,16 @@ static int handle_number(void *ctx, const char *num, size_t len) {
         double d = strtod(num, NULL);
         yyjson_mut_obj_add_double(
             cur->doc_root,
-            peek(cur, object_stack),
-            peek(cur, key_stack),
+            cur->object_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
+            cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
             d
         );
     } else {
         long i = strtoll(num, NULL, 10);
         yyjson_mut_obj_add_int(
             cur->doc_root,
-            peek(cur, object_stack),
-            peek(cur, key_stack),
+            cur->object_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
+            cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
             i
         );
     }
@@ -208,14 +211,17 @@ static int handle_string(void *ctx, const unsigned char *str,
         return 1;
     }
 
-    if (cur->current_depth == 0 || !peek(cur, key_stack) || !peek(cur, object_stack)) {
+    if (cur->current_depth == 0 
+        || !(cur->object_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0])
+        || !(cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0]))
+    {
         return 0;
     }
 
     yyjson_mut_obj_add_strncpy(
         cur->doc_root,
-        peek(cur, object_stack),
-        peek(cur, key_stack),
+        cur->object_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
+        cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
         (char *) str,
         len
     );
@@ -236,8 +242,8 @@ static int handle_start_map(void *ctx) {
             yyjson_mut_val *new_obj = yyjson_mut_obj(cur->doc_root);
             yyjson_mut_obj_add_val(
                 cur->doc_root,
-                peek(cur, object_stack),
-                peek(cur, key_stack),
+                cur->object_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
+                cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0],
                 new_obj
             );
             cur->object_stack[cur->current_depth] = new_obj;
@@ -252,19 +258,19 @@ static int handle_start_map(void *ctx) {
 
 static int handle_map_key(void *ctx,
                           const unsigned char *str,
-                          size_t len)
+                          size_t length)
 {
     struct json_writable *cur = ctx;
-    char *next_key = strndup((const char *) str, len);
+    char *next_key = strndup((const char *) str, length);
     if (cur->path 
-        && len == cur->path->length
-        && strncmp(next_key, cur->path->buffer, len) == 0)
+        && length == cur->path->length
+        && strncmp(next_key, peek(cur->path), length) == 0)
     {
         if (cur->path->next == NULL && cur->path_parent == NULL) {
             // this will only run once since path_parent is the same for every row
             cur->path_parent = cur->path;
         }
-        cur->path = cur->path->next;
+        cur->path = next(cur->path);
     }
 
     if (cur->path) {
@@ -279,7 +285,7 @@ static int handle_map_key(void *ctx,
 
     cur->keys[cur->keys_size++] = next_key;
     // Store the new key for this depth
-    peek(cur, key_stack) = next_key;
+    cur->key_stack[cur->current_depth > 0 ? cur->current_depth - 1 : 0] = next_key;
 
     return 1;
 }
@@ -564,5 +570,4 @@ FILE *cookie(const struct cookie *backend, void *ctx) {
 }
 
 #undef push
-#undef peek
 #undef MAX_DEPTH
