@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 struct list *__list_next(struct list *ls) {
     if (ls) {
         return ls->next;

@@ -266,7 +266,7 @@ static int handle_map_key(void *ctx,
         && length == cur->path->length
         && strncmp(next_key, peek(cur->path), length) == 0)
     {
-        if (cur->path->next == NULL && cur->path_parent == NULL) {
+        if (next(cur->path) == NULL && cur->path_parent == NULL) {
             // this will only run once since path_parent is the same for every row
             cur->path_parent = cur->path;
         }
@@ -547,19 +547,19 @@ const struct cookie COOKIE_JSON = {
     .destroy = json_destroy
 };
 
-FILE *cookie(const struct cookie *backend, void *ctx) {
-    if (!backend || !backend->init)
+FILE *cookie(const struct cookie *cfns, void *ctx) {
+    if (!cfns || !cfns->init)
         return NULL;
 
-    void *state = backend->init(ctx);
+    void *state = cfns->init(ctx);
     if (!state)
         return NULL;
 
-    FILE *f = fopencookie(state, "w+", backend->f);
+    FILE *f = fopencookie(state, "w+", cfns->f);
     if (!f) {
         /* fopencookie failed — backend state must be destroyed */
-        if (backend->destroy)
-            backend->destroy(state);
+        if (cfns->destroy)
+            cfns->destroy(state);
         return NULL;
     }
 
