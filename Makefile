@@ -13,7 +13,8 @@ SQLITE_TARGET  := lib$(SQLITE_EXT).so
 SRC_COMMON := \
     src/vapi.c \
     src/lib/cookie.c src/lib/fetch.c \
-    src/lib/cfns.c src/lib/tcp.c src/lib/sql.c
+    src/lib/cfns.c src/lib/tcp.c src/lib/sql.c \
+	src/lib/iter8.c
 
 SRC_SQLITE := \
     src/vttp.c

@@ -1,4 +1,5 @@
 #include "cfns.h"
+#include "iter8.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -86,15 +87,10 @@ const struct cookie COOKIE_PASSTHROUGH = {
     .destroy = passthrough_destroy,
 };
 
-typedef struct jsonpath {
-    struct jsonpath *next;
-    struct string key;
-} jsonpath;
-
 struct json_writable {
     yajl_handle parser;
-    jsonpath *path;
-    jsonpath *path_parent;
+    list8 *path;
+    list8 *path_parent;
     unsigned int current_depth;
     struct deque8 *queue;
 
@@ -261,8 +257,8 @@ static int handle_map_key(void *ctx,
     struct json_writable *cur = ctx;
     char *next_key = strndup((const char *) str, len);
     if (cur->path 
-        && len == cur->path->key.length
-        && strncmp(next_key, cur->path->key.hd, len) == 0)
+        && len == cur->path->length
+        && strncmp(next_key, cur->path->buffer, len) == 0)
     {
         if (cur->path->next == NULL && cur->path_parent == NULL) {
             // this will only run once since path_parent is the same for every row

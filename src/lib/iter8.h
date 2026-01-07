@@ -1,14 +1,35 @@
 /**
- * Byte data list handle
+ * @file iter8.h
+ * @brief Iterable byte-sized buffer data structures
  */
-typedef struct list8 list8;
+#pragma once
+#include <stddef.h>
 
-typedef struct stack8 stack8;
+/**
+ * doubly linked list.
+ */
+typedef struct list8 {
+    struct list8 *next;
+    struct list8 *prev;
+    char *buffer;
+    size_t length;
+} list8;
 
-int list8_next(list8 *, unsigned char *);
-int stack8_pop(stack8 *, unsigned char *);
+/**
+ * Go to the next node in the list in NODE, if it exists.
+ */
+struct list8 *__list8_next(struct list8 *node);
+struct list8 *__list8_new(struct list8 init);
 
-#define next8(obj) _Generic((obj), \
-    struct list8: list8_next, \
-    struct stack8: stack8_next \
-)
+/**
+ * @brief Get the next value from ITER.
+ *
+ * You can also call the `__` prefixed implementation
+ * functions directly, so this is really just for typing convenience.
+ */
+#define next8(iter) \
+    _Generic((iter), \
+        struct list8 *:  __list8_next \
+    )(iter)
+
+#define List8(...) __list8_new((struct list8){ __VA_ARGS__ })
