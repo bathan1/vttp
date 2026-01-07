@@ -44,6 +44,11 @@ const char *__str_get(struct str s);
  */
 bool __str_done(struct str s);
 
+/**
+ * @brief Appends char CH directly to S's buffer if IS_MUTABLE. Otherwise, return a *copy* of S 
+ */
+bool __str_insert(struct str s, char ch);
+
 /* LIST */
 
 /**
@@ -72,21 +77,60 @@ struct str __list_get(struct list *ls);
 bool __list_done(struct list *ls);
 
 /**
+ * @brief Appends S to the *tail* end of LS *dynamically*.
+ */
+bool __list_insert(struct list *ls, struct str s);
+
+/* QUEUE */
+
+/**
+ * @brief FIFO over char buffers.
+ */
+typedef struct queue queue;
+
+/**
+ * @brief Pops the front string of Q.
+ */
+struct str __queue_next(struct queue *q);
+
+/**
+ * @brief Read size of Q;
+ */
+size_t __queue_len(struct queue *q);
+
+/**
+ * @brief Peek the front string of Q.
+ */
+struct str __queue_get(struct queue *q);
+
+/**
+ * @brief Cleanup dynamically allocated Q.
+ */
+bool __queue_done(struct queue *q);
+
+/**
+ * @brief Enqueue S in Q.
+ */
+bool __queue_insert(struct queue *q, struct str s);
+
+/**
  * @brief Get the empty value for **type** T.
  */
 #define empty(T) \
     _Generic((T *)0, \
         struct str *: STR_EMPTY, \
-        struct list **: NULL \
+        struct list **: NULL, \
+        struct queue **: NULL \
     )
 
 /**
- * @brief Return the next value of ITER.
+ * @brief Return the next value of ITER. 
  */
 #define next(iter) \
     _Generic((iter), \
         struct str: __str_next, \
-        struct list *: __list_next \
+        struct list *: __list_next, \
+        struct queue *: __queue_next \
     )(iter)
 
 /**
@@ -95,7 +139,8 @@ bool __list_done(struct list *ls);
 #define len(iter) \
     _Generic((iter), \
         struct str: __str_len, \
-        struct list *: __list_len \
+        struct list *: __list_len, \
+        struct queue *: __queue_len \
     )(iter)
 
 /**
@@ -104,7 +149,8 @@ bool __list_done(struct list *ls);
 #define get(iter) \
     _Generic((iter), \
         struct str: __str_get, \
-        struct list *: __list_get \
+        struct list *: __list_get, \
+        struct queue *: __queue_get \
     )(iter)
 
 /**
@@ -113,6 +159,16 @@ bool __list_done(struct list *ls);
 #define done(iter) \
     _Generic((iter), \
         struct str: __str_done, \
-        struct list *: __list_done \
+        struct list *: __list_done, \
+        struct queue *: __queue_done \
     )(iter)
 
+/**
+ * @brief Return the next value of ITER. 
+ */
+#define insert(iter, value) \
+    _Generic((iter), \
+        struct str: __str_insert, \
+        struct list *: __list_insert, \
+        struct queue *: __queue_insert \
+    )((iter), (value))
