@@ -2,7 +2,7 @@
 
 #include "tcp.h"
 #include "fetch.h"
-#include "stream.h"
+#include "cookie.h"
 
 #include <netdb.h>
 #include <openssl/types.h>

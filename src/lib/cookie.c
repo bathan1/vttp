@@ -1,5 +1,5 @@
 #include "cfns.h"
-#include "stream.h"
+#include "cookie.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -26,12 +26,12 @@ struct cookie {
     void  (*destroy)(void *);     // free backend state
 };
 
-struct passthrough_state {
+struct passthrough {
     struct deque8 *queue;
 };
 
 static ssize_t passthrough_write(void *c, const char *buf, size_t n) {
-    struct passthrough_state *st = c;
+    struct passthrough *st = c;
     char *copy = malloc(n);
     memcpy(copy, buf, n);
     deque8_push(st->queue, copy);
@@ -39,7 +39,7 @@ static ssize_t passthrough_write(void *c, const char *buf, size_t n) {
 }
 
 static ssize_t passthrough_read(void *c, char *buf, size_t n) {
-    struct passthrough_state *st = c;
+    struct passthrough *st = c;
     char *cur = deque8_pop(st->queue);
     if (!cur) return 0;
     size_t len = strlen(cur);
@@ -50,14 +50,14 @@ static ssize_t passthrough_read(void *c, char *buf, size_t n) {
 }
 
 static int passthrough_close(void *c) {
-    struct passthrough_state *st = c;
+    struct passthrough *st = c;
     deque8_free(st->queue);
     free(st);
     return 0;
 }
 
 static void *passthrough_init(void) {
-    struct passthrough_state *st = calloc(1, sizeof *st);
+    struct passthrough *st = calloc(1, sizeof *st);
     if (!st)
         return NULL;
 
@@ -72,7 +72,7 @@ static void *passthrough_init(void) {
 }
 
 static void passthrough_destroy(void *state) {
-    struct passthrough_state *st = state;
+    struct passthrough *st = state;
     if (!st)
         return;
 

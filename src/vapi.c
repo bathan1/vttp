@@ -1,5 +1,6 @@
-#include "lib/stream.h"
+#include "lib/cookie.h"
 #include "lib/fetch.h"
+
 #include <asm-generic/errno-base.h>
 #include <pthread.h>
 #include <stdlib.h>

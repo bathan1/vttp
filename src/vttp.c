@@ -90,14 +90,6 @@ typedef struct fetch_cursor {
 
 #define X_UPDATE_OFFSET 2
 
-static bool is_key_url(char *key) {
-    return strncmp("url", key, 3) == 0;
-}
-
-static bool is_key_body(char *key) {
-    return strncmp("body", key, 4) == 0;
-}
-
 // For tokens "fetch" (module name), "main" (schema), "patients" (vtable name), and
 // at least 1 argument for the url argument
 #define MIN_ARGC 4

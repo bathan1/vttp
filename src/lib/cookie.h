@@ -20,6 +20,11 @@ typedef struct cookie cookie_t;
 FILE *cookie(const struct cookie *backend);
 
 /**
+ * The trivial cookie implementation that just forwards written bytes into a readable end.
+ */
+extern const struct cookie COOKIE_PASSTHROUGH;
+
+/**
  * JSON object list stream. It separates elements by newline '\n', so it's basically NDJSON.
  */
 extern const struct cookie COOKIE_JSON;
