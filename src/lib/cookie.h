@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include "cfns.h"
 
-typedef struct cookie cookie_t;
+struct cookie;
 
 /**
  * Initialize a custom io stream with the provided callbacks in IO with nullable CTX.

@@ -1,5 +1,4 @@
 #include "cfns.h"
-#include "cookie.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -14,7 +13,7 @@
 #define push(cur, field, value) ((cur->field[cur->current_depth]) = value)
 
 struct cookie {
-    const cookie_io_functions_t ops;
+    const cookie_io_functions_t f;
 
     void *(*init)(void *);          // allocate backend state
     void  (*destroy)(void *);     // free backend state
@@ -77,7 +76,7 @@ static void passthrough_destroy(void *state) {
 }
 
 const struct cookie COOKIE_PASSTHROUGH = {
-    .ops = {
+    .f = {
         .write = passthrough_write,
         .read  = passthrough_read,
         .close = passthrough_close,
@@ -89,7 +88,6 @@ const struct cookie COOKIE_PASSTHROUGH = {
 
 typedef struct jsonpath {
     struct jsonpath *next;
-    bool is_array;
     struct string key;
 } jsonpath;
 
@@ -536,8 +534,8 @@ static void json_destroy(void *state) {
     free(jc);
 }
 
-const cookie_t COOKIE_JSON = {
-    .ops = {
+const struct cookie COOKIE_JSON = {
+    .f = {
         .write = json_fwrite,
         .close = json_fclose,
         .read  = json_fread,
@@ -555,7 +553,7 @@ FILE *cookie(const struct cookie *backend, void *ctx) {
     if (!state)
         return NULL;
 
-    FILE *f = fopencookie(state, "w+", backend->ops);
+    FILE *f = fopencookie(state, "w+", backend->f);
     if (!f) {
         /* fopencookie failed — backend state must be destroyed */
         if (backend->destroy)
