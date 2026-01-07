@@ -10,14 +10,8 @@
 /** Fixed number of JSON object levels to traverse before returning. */
 #define MAX_DEPTH 64
 
-#define peek(cur, field) (cur->field[cur->current_depth - 1])
+#define peek(cur, field) (cur->field[cur->current_depth > 0 ? cur->current_depth - 1 : 0])
 #define push(cur, field, value) ((cur->field[cur->current_depth]) = value)
-
-typedef struct jsonpath {
-    struct jsonpath *next;
-    bool is_array;
-    struct string key;
-} jsonpath;
 
 struct cookie {
     const cookie_io_functions_t ops;
@@ -93,8 +87,16 @@ const struct cookie COOKIE_PASSTHROUGH = {
     .destroy = passthrough_destroy,
 };
 
-struct cookie_writable {
+typedef struct jsonpath {
+    struct jsonpath *next;
+    bool is_array;
+    struct string key;
+} jsonpath;
+
+struct json_writable {
     yajl_handle parser;
+    jsonpath *path_hd;
+    jsonpath *path;
     unsigned int current_depth;
     struct deque8 *queue;
 
@@ -102,54 +104,54 @@ struct cookie_writable {
     char **keys;
     size_t keys_size;
     size_t keys_cap;
-    char *keystack[MAX_DEPTH];
+    char *key_stack[MAX_DEPTH];
 
     yyjson_mut_doc *doc_root;
-    // object node stack
-    yyjson_mut_val *object[MAX_DEPTH];
+    yyjson_mut_val *object_stack[MAX_DEPTH];
     unsigned int pp_flags;
 };
 
-struct cookie_readable {
+struct json_readable {
     struct deque8 *queue;
     char *current;
     size_t length;
     size_t offset;
     bool emit_newline;
 };
+
 typedef struct json {
-    struct cookie_writable writable;
-    struct cookie_readable readable;
+    struct json_writable writable;
+    struct json_readable readable;
 } json_t;
 
 static int handle_null(void *ctx) {
-    struct cookie_writable *state = ctx;
+    struct json_writable *state = ctx;
     if (state->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
     }
-    if (!peek(state, keystack)) {
+    if (!peek(state, key_stack)) {
         fprintf(stderr, "no parent key value from depth %u\n", state->current_depth);
         return 0;
     }
-    yyjson_mut_obj_add_null(state->doc_root, peek(state, object), peek(state, keystack));
+    yyjson_mut_obj_add_null(state->doc_root, peek(state, object_stack), peek(state, key_stack));
     return 1;
 }
 
 static int handle_bool(void *ctx, int b) {
-    struct cookie_writable *state = ctx;
+    struct json_writable *state = ctx;
     if (state->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
     }
-    if (!peek(state, keystack)) {
+    if (!peek(state, key_stack)) {
         fprintf(stderr, "no parent key value from depth %u\n", state->current_depth);
         return 0;
     }
     yyjson_mut_obj_add_bool(
         state->doc_root,
-        peek(state, object),
-        peek(state, keystack),
+        peek(state, object_stack),
+        peek(state, key_stack),
         b
     );
     return 1;
@@ -164,12 +166,12 @@ static int handle_double(void *ctx, double d) {
 }
 
 static int handle_number(void *ctx, const char *num, size_t len) {
-    struct cookie_writable *cur = ctx;
+    struct json_writable *cur = ctx;
     if (cur->current_depth == 0) {
         fprintf(stderr, "current_depth is 0\n");
         return 0;
     }
-    if (!peek(cur, keystack)) {
+    if (!peek(cur, key_stack)) {
         fprintf(stderr, "no parent key value from depth %u\n", cur->current_depth);
         return 0;
     }
@@ -187,16 +189,16 @@ static int handle_number(void *ctx, const char *num, size_t len) {
         double d = strtod(num, NULL);
         yyjson_mut_obj_add_double(
             cur->doc_root,
-            peek(cur, object),
-            peek(cur, keystack),
+            peek(cur, object_stack),
+            peek(cur, key_stack),
             d
         );
     } else {
         long i = strtoll(num, NULL, 10);
         yyjson_mut_obj_add_int(
             cur->doc_root,
-            peek(cur, object),
-            peek(cur, keystack),
+            peek(cur, object_stack),
+            peek(cur, key_stack),
             i
         );
     }
@@ -207,16 +209,19 @@ static int handle_number(void *ctx, const char *num, size_t len) {
 static int handle_string(void *ctx, const unsigned char *str, 
                          size_t len)
 {
-    struct cookie_writable *cur = ctx;
+    struct json_writable *cur = ctx;
+    if (cur->path) {
+        return 1;
+    }
 
-    if (cur->current_depth == 0 || !peek(cur, keystack) || !peek(cur, object)) {
+    if (cur->current_depth == 0 || !peek(cur, key_stack) || !peek(cur, object_stack)) {
         return 0;
     }
 
     yyjson_mut_obj_add_strncpy(
         cur->doc_root,
-        peek(cur, object),
-        peek(cur, keystack),
+        peek(cur, object_stack),
+        peek(cur, key_stack),
         (char *) str,
         len
     );
@@ -225,25 +230,27 @@ static int handle_string(void *ctx, const unsigned char *str,
 }
 
 static int handle_start_map(void *ctx) {
-    struct cookie_writable *cur = ctx;
-    if (cur->current_depth == 0) {
-        yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
-        yyjson_mut_val *obj = yyjson_mut_obj(doc);
-        yyjson_mut_doc_set_root(doc, obj);
-        cur->doc_root = doc;
-        cur->object[0] = yyjson_mut_doc_get_root(doc);
-    } else {
-        yyjson_mut_val *new_obj = yyjson_mut_obj(cur->doc_root);
-        yyjson_mut_obj_add_val(
-            cur->doc_root,
-            peek(cur, object),
-            peek(cur, keystack),
-            new_obj
-        );
-        cur->object[cur->current_depth] = new_obj;
+    struct json_writable *cur = ctx;
+    if (!cur->path) {
+        if (cur->current_depth == 0) {
+            yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
+            yyjson_mut_val *obj = yyjson_mut_obj(doc);
+            yyjson_mut_doc_set_root(doc, obj);
+            cur->doc_root = doc;
+            cur->object_stack[0] = yyjson_mut_doc_get_root(doc);
+        } else {
+            yyjson_mut_val *new_obj = yyjson_mut_obj(cur->doc_root);
+            yyjson_mut_obj_add_val(
+                cur->doc_root,
+                peek(cur, object_stack),
+                peek(cur, key_stack),
+                new_obj
+            );
+            cur->object_stack[cur->current_depth] = new_obj;
+        }
+        cur->current_depth++;
     }
 
-    cur->current_depth++;
 
     return 1;
 }
@@ -253,23 +260,37 @@ static int handle_map_key(void *ctx,
                           const unsigned char *str,
                           size_t len)
 {
-    struct cookie_writable *cur = ctx;
+    struct json_writable *cur = ctx;
+    char *next_key = strndup((const char *) str, len);
+    if (cur->path 
+        && len == cur->path->key.length
+        && strncmp(next_key, cur->path->key.hd, len) == 0)
+    {
+        printf("here!\n");
+        cur->path = cur->path->next;
+    }
+
+    if (cur->path) {
+        return 1;
+    }
+
     if (cur->keys_size >= cur->keys_cap) {
         // double
         cur->keys_cap *= 2;
         cur->keys = realloc(cur->keys, cur->keys_cap * sizeof(char *));
     }
 
-    char *next_key = strndup((const char *) str, len);
     cur->keys[cur->keys_size++] = next_key;
     // Store the new key for this depth
-    peek(cur, keystack) = next_key;
+    peek(cur, key_stack) = next_key;
 
     return 1;
 }
 
 static int handle_end_map(void *ctx) {
-    struct cookie_writable *cur = ctx;
+    struct json_writable *cur = ctx;
+    if (cur->path) {return 1;}
+
     if (cur->current_depth == 1) {
         // closing root object because root object set depth to 1,
         // so that any nested object child can recursively push its own
@@ -297,6 +318,8 @@ static int handle_end_map(void *ctx) {
 
         // free(cur->queue.handle);
         yyjson_doc_free(final);
+
+        cur->path = cur->path_hd;
     }
     cur->current_depth--;
 
@@ -327,8 +350,8 @@ static yajl_callbacks callbacks = {
     .yajl_end_array   = handle_end_array
 };
 
-static struct cookie_writable *use_state(void) {
-    struct cookie_writable *st = calloc(1, sizeof(struct cookie_writable));
+static struct json_writable *use_state(void) {
+    struct json_writable *st = calloc(1, sizeof(struct json_writable));
     if (!st) return perror_rc(NULL, "calloc()", 0);
 
     st->keys_cap = 1 << 8;     // 256
@@ -342,17 +365,6 @@ static struct cookie_writable *use_state(void) {
     st->queue = NULL;
 
     return st;
-}
-
-static void free_state(struct cookie_writable *st) {
-    if (!st) return;
-
-    // Don't free st->queue here — it's not owned by the state!
-
-    if (st->keys)
-        free(st->keys);
-
-    free(st);
 }
 
 size_t fwrite8(const char *src, size_t n, FILE *dst)
@@ -377,13 +389,13 @@ size_t fwrite8(const char *src, size_t n, FILE *dst)
     return written;
 }
 
-static ssize_t cookie_json_fwrite(void *__cookie, const char *buf, size_t size) {
+static ssize_t json_fwrite(void *__cookie, const char *buf, size_t size) {
     json_t *cookie = __cookie;
     yajl_parse(cookie->writable.parser, (const unsigned char *)buf, size);
     return size;
 }
 
-static int cookie_json_fclose(void *__cookie) {
+static int json_fclose(void *__cookie) {
     int rc = 0;
     json_t *cookie = (void *) __cookie;
     if (!cookie) {
@@ -408,7 +420,7 @@ static int cookie_json_fclose(void *__cookie) {
     return 0;
 }
 
-static ssize_t cookie_json_fread(void *__cookie, char *buf, size_t size)
+static ssize_t json_fread(void *__cookie, char *buf, size_t size)
 {
     json_t *cookie = __cookie;
 
@@ -461,7 +473,8 @@ static ssize_t cookie_json_fread(void *__cookie, char *buf, size_t size)
     return out;
 }
 
-
+jsonpath resource = { .key = String("resource"), .is_array = false, .next = NULL };
+jsonpath entry = { .key = String("entry"), .is_array = true, .next = &resource };
 
 static void *json_init(void) {
     struct json *jc = calloc(1, sizeof *jc);
@@ -481,6 +494,9 @@ static void *json_init(void) {
         goto fail;
 
     deque8_init(jc->readable.queue);
+
+    /* body path */
+    jc->writable.path_hd = jc->writable.path = &entry; 
 
     /* yajl parser */
     jc->writable.parser =
@@ -523,17 +539,16 @@ static void json_destroy(void *state) {
 
 const cookie_t COOKIE_JSON = {
     .ops = {
-        .write = cookie_json_fwrite,
-        .close = cookie_json_fclose,
-        .read  = cookie_json_fread,
+        .write = json_fwrite,
+        .close = json_fclose,
+        .read  = json_fread,
         .seek  = NULL,
     },
     .init = json_init,
     .destroy = json_destroy
 };
 
-FILE *cookie(const struct cookie *backend)
-{
+FILE *cookie(const struct cookie *backend) {
     if (!backend || !backend->init)
         return NULL;
 
