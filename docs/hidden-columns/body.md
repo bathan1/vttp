@@ -58,7 +58,7 @@ LIMIT 5;
 We will be able to view our patient rows:
 
 ```sql
-sqlite> SELECT COUNT(*), * FROM patients
+sqlite> SELECT COUNT(*) as count, * FROM patients
         WHERE body = '$.entry[*].resource'
         LIMIT 5;
 ```

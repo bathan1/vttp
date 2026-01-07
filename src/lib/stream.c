@@ -6,12 +6,17 @@
 #include <yyjson.h>
 #include <yajl/yajl_parse.h>
 
-
 /** Fixed number of JSON object levels to traverse before returning. */
 #define MAX_DEPTH 64
 
 #define peek(cur, field) (cur->field[cur->current_depth - 1])
 #define push(cur, field, value) ((cur->field[cur->current_depth]) = value)
+
+typedef struct jsonpath {
+    struct jsonpath *next;
+    bool is_array;
+    struct string key;
+} jsonpath;
 
 struct stream_cookie_writable {
     yajl_handle parser;
@@ -34,10 +39,17 @@ struct stream_cookie_writable {
 struct stream_cookie_readable {
     struct deque8 *queue;
     char *current;
-    size_t len;
+    size_t length;
     size_t offset;
     bool emit_newline;
 };
+typedef struct cookie {
+    struct stream_cookie_writable writable;
+
+    struct stream_cookie_readable readable;
+} cookie_t;
+
+
 
 /** YAJL parser callbacks */
 static yajl_callbacks callbacks;
@@ -137,12 +149,12 @@ static ssize_t stream_fread(void *cookie, char *buf, size_t size)
             if (!c->current)
                 return out;  // EOF if nothing written
 
-            c->len = strlen(c->current);
+            c->length = strlen(c->current);
             c->offset = 0;
         }
 
         /* Emit JSON bytes */
-        size_t remaining = c->len - c->offset;
+        size_t remaining = c->length - c->offset;
         size_t to_copy = remaining < (size - out)
             ? remaining
             : (size - out);
@@ -153,7 +165,7 @@ static ssize_t stream_fread(void *cookie, char *buf, size_t size)
         out += to_copy;
 
         /* Finished this object */
-        if (c->offset == c->len) {
+        if (c->offset == c->length) {
             free(c->current);
             c->current = NULL;
             c->emit_newline = true;  // <-- CRITICAL
@@ -412,7 +424,7 @@ static void free_state(struct stream_cookie_writable *st) {
 size_t fwrite8(const char *src, size_t n,
                size_t max, FILE *dst)
 {
-    size_t to_copy = n < max ? n : max;
+    size_t to_copy = max == 0 || n < max ? n : max;
     size_t written = fwrite(src, sizeof(char), to_copy, dst);
     if (written == 0) {
         int err = errno;
@@ -427,13 +439,166 @@ size_t fwrite8(const char *src, size_t n,
         if (err != 0) {
             char *errmsg = strerror(err);
             fprintf(stderr, ": %s", errmsg);
-            free(errmsg);
         }
         fprintf(stderr, "\n");
     }
     return written;
 }
 
+static ssize_t cookie_json_fwrite(void *__cookie, const char *buf, size_t size) {
+    cookie_t *cookie = __cookie;
+    yajl_parse(cookie->writable.parser, (const unsigned char *)buf, size);
+    return size;
+}
+
+static int cookie_json_fclose(void *__cookie) {
+    int rc = 0;
+    cookie_t *cookie = (void *) __cookie;
+    if (!cookie) {
+        rc += 1;
+    }
+
+    // cleanup write end
+    if (cookie->writable.parser) {
+        yajl_free(cookie->writable.parser);
+    }
+    if (cookie->writable.keys) {
+        free(cookie->writable.keys);
+    }
+
+    /// cleanup queue
+    if (!cookie->readable.queue) { 
+        rc += 1;
+    }
+    deque8_free(cookie->readable.queue);
+
+    free(cookie);
+    return 0;
+}
+
+static ssize_t cookie_json_fread(void *__cookie, char *buf, size_t size)
+{
+    cookie_t *cookie = __cookie;
+
+    if (size == 0) {
+        return 0;
+    }
+
+    size_t out = 0;
+
+    while (out < size) {
+        /* Emit newline if pending */
+        if (cookie->readable.emit_newline) {
+            buf[out++] = '\n';
+            cookie->readable.emit_newline = false;
+            return out;   // return immediately (stream semantics)
+        }
+
+        /* Load next JSON object if needed */
+        if (!cookie->readable.current) {
+            cookie->readable.current = deque8_pop(cookie->readable.queue);
+            if (!cookie->readable.current)
+                return out;  // EOF if nothing written
+
+            cookie->readable.length = strlen(cookie->readable.current);
+            cookie->readable.offset = 0;
+        }
+
+        /* Emit JSON bytes */
+        size_t remaining = cookie->readable.length - cookie->readable.offset;
+        size_t to_copy = remaining < (size - out)
+            ? remaining
+            : (size - out);
+
+        memcpy(buf + out, cookie->readable.current + cookie->readable.offset, to_copy);
+
+        cookie->readable.offset += to_copy;
+        out += to_copy;
+
+        if (cookie->readable.offset == cookie->readable.length) {
+            free(cookie->readable.current);
+            cookie->readable.current = NULL;
+            cookie->readable.emit_newline = true;
+        }
+
+        /* Return once we’ve produced something */
+        if (out > 0)
+            return out;
+    }
+
+    return out;
+}
+
+
+FILE *cookie(jsonpath *path) {
+    cookie_t *cookie = calloc(1, sizeof(cookie_t));
+    if (!cookie) {
+        return enomem(NULL);
+    }
+    cookie->writable.keys_cap = 256;
+    cookie->writable.keys = calloc(256, sizeof(char *));
+    if (!cookie->writable.keys) {
+        free(cookie);
+        return enomem(NULL);
+    }
+
+    deque8 *queue = calloc(1, sizeof(deque8));
+    if (!queue) {
+        free(cookie->writable.keys);
+        free(cookie);
+        return enomem(NULL);
+    }
+    deque8_init(queue);
+    cookie->readable.queue = cookie->writable.queue = queue;
+
+    cookie->writable.parser = yajl_alloc(&callbacks, NULL, (void *) &cookie->writable);
+    if (!cookie->writable.parser) {
+        deque8_free(queue);
+        free(cookie->writable.keys);
+        free(cookie);
+        return enomem(NULL);
+    }
+    printf("writable.parser=%p\n", cookie->writable.parser);
+    
+    cookie_io_functions_t COOKIE_JSON = {
+        .write = cookie_json_fwrite,
+        .close = cookie_json_fclose,
+        .read  = cookie_json_fread,
+        .seek  = NULL,
+    };
+
+    FILE *f = fopencookie(cookie, "w+", COOKIE_JSON);
+    setvbuf(f, NULL, _IONBF, 0);
+    return f;
+}
+
 #undef push
 #undef peek
 #undef MAX_DEPTH
+
+int main() {
+    jsonpath resource = {
+        .key = String("resource"),
+        .is_array = false,
+        .next = NULL
+    };
+    jsonpath entry = {
+        .key = String("entry"),
+        .is_array = true,
+        .next = &resource
+    };
+
+    FILE *handle = cookie(&entry);
+
+    char bundle[] = "{\"resourceType\": \"Bundle\", \"entry\": [{\"resource\": {\"resourceType\": \"Patient\"}}]}";
+
+    fwrite8(bundle, sizeof(bundle) - 1, 0, handle);
+    char *bundle_returned = NULL;
+    size_t cap = 0;
+    fflush(handle);
+    rewind(handle);
+    getline(&bundle_returned, &cap, handle);
+
+    printf("%s", bundle_returned);
+    return 0;
+}

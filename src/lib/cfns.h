@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+
 /// String helpers
 
 /**
@@ -102,7 +103,7 @@ struct string uppercase_im(const struct string s);
  *
  * Reads are constant-time from both its head and its tail, so it's technically a "deque".
  */
-struct deque8 {
+typedef struct deque8 {
     /** The actual buffer. */
     char **buffer;
 
@@ -117,7 +118,7 @@ struct deque8 {
 
     /** Stored size. Is updated dynamically from calls to #bassoon_pop. */
     unsigned long count;
-};
+} deque8;
 
 /**
  * @brief Initializes the dequeue at DEQUE.
@@ -161,3 +162,11 @@ char *deque8_pop(struct deque8 *deque);
  */
 #define perror_rc(__rc, __tag, ...)                              \
     (perror(__tag), __VA_ARGS__, (__rc))
+
+#define printf_err(__rc, ...) \
+    (fprintf(stderr, __VA_ARGS__), (__rc))
+
+#define enomem(__rc) \
+    (printf_err(__rc, "out of memory"))
+
+#define String(__hd) ((struct string){.hd=__hd,.length=sizeof(__hd)-1})

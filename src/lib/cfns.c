@@ -337,3 +337,4 @@ char *deque8_pop(struct deque8 *q) {
 
     return val;
 }
+
