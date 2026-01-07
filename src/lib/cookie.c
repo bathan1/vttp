@@ -95,8 +95,8 @@ typedef struct jsonpath {
 
 struct json_writable {
     yajl_handle parser;
-    jsonpath *path_hd;
     jsonpath *path;
+    jsonpath *path_parent;
     unsigned int current_depth;
     struct deque8 *queue;
 
@@ -266,7 +266,10 @@ static int handle_map_key(void *ctx,
         && len == cur->path->key.length
         && strncmp(next_key, cur->path->key.hd, len) == 0)
     {
-        printf("here!\n");
+        if (cur->path->next == NULL && cur->path_parent == NULL) {
+            // this will only run once since path_parent is the same for every row
+            cur->path_parent = cur->path;
+        }
         cur->path = cur->path->next;
     }
 
@@ -318,8 +321,7 @@ static int handle_end_map(void *ctx) {
 
         // free(cur->queue.handle);
         yyjson_doc_free(final);
-
-        cur->path = cur->path_hd;
+        cur->path = cur->path_parent;
     }
     cur->current_depth--;
 
@@ -496,7 +498,8 @@ static void *json_init(void) {
     deque8_init(jc->readable.queue);
 
     /* body path */
-    jc->writable.path_hd = jc->writable.path = &entry; 
+    jc->writable.path = &entry; 
+    jc->writable.path_parent = NULL;
 
     /* yajl parser */
     jc->writable.parser =
