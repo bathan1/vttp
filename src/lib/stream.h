@@ -9,10 +9,17 @@
 #include "cfns.h"
 
 /**
- * `fwrite()` on N or MAX bytes of data (whichever is smaller) from SRC buffer to DST stream.
+ * `fwrite()` on N bytes of data from SRC buffer to DST stream.
  */
-size_t fwrite8(const char *src, size_t n,
-               size_t max, FILE *dst);
+size_t fwrite8(const char *src, size_t n, FILE *dst);
+
+/**
+ * Initialize a custom io stream with the provided callbacks in IO.
+ *
+ * ...
+ *
+ * 내가 만든 쿠키
+ */
 FILE *cookie(cookie_io_functions_t io);
 
 /**

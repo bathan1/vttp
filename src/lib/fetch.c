@@ -294,7 +294,8 @@ static void handle_http_body_bytes(struct fetch_state *st,
 {
 
     if (!st->chunked_mode && st->content_length > 0) {
-        st->content_length -= fwrite8(data, len, st->content_length, st->stream);
+        size_t to_copy = len < st->content_length ? len : st->content_length;
+        st->content_length -= fwrite8(data, to_copy, st->stream);
     } else {
         size_t i = 0;
         while (i < len) {
@@ -334,7 +335,8 @@ static void handle_http_body_bytes(struct fetch_state *st,
 
             /* 2. READ CHUNK PAYLOAD */
             if (!st->reading_chunk_size && st->current_chunk_size > 0) {
-                size_t written = fwrite8(data + i, len - i, st->current_chunk_size, st->stream);
+                size_t to_copy = len - i < st->current_chunk_size ? len - i : st->current_chunk_size;
+                size_t written = fwrite8(data + i, to_copy, st->stream);
                 i += written;
                 st->current_chunk_size -= written;
 

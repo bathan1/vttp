@@ -23,16 +23,15 @@ struct cookie_writable {
     unsigned int current_depth;
     struct deque8 *queue;
 
-    // clarinet frees everything from here
+    // JSON property names memory
     char **keys;
     size_t keys_size;
     size_t keys_cap;
-    // key stack
     char *keystack[MAX_DEPTH];
+
     yyjson_mut_doc *doc_root;
     // object node stack
     yyjson_mut_val *object[MAX_DEPTH];
-
     unsigned int pp_flags;
 };
 
@@ -281,18 +280,16 @@ static void free_state(struct cookie_writable *st) {
     free(st);
 }
 
-size_t fwrite8(const char *src, size_t n,
-               size_t max, FILE *dst)
+size_t fwrite8(const char *src, size_t n, FILE *dst)
 {
-    size_t to_copy = max == 0 || n < max ? n : max;
-    size_t written = fwrite(src, sizeof(char), to_copy, dst);
+    size_t written = fwrite(src, sizeof(char), n, dst);
     if (written == 0) {
         int err = errno;
         if (ferror(dst)) {
             fprintf(
                 stderr,
                 "[fwrite8] write failed (requested %zu bytes)",
-                to_copy
+                n
             );
         }
 
