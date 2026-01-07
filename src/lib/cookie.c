@@ -16,7 +16,7 @@
 struct cookie {
     const cookie_io_functions_t ops;
 
-    void *(*init)(void);          // allocate backend state
+    void *(*init)(void *);          // allocate backend state
     void  (*destroy)(void *);     // free backend state
 };
 
@@ -50,7 +50,7 @@ static int passthrough_close(void *c) {
     return 0;
 }
 
-static void *passthrough_init(void) {
+static void *passthrough_init(void *_) {
     struct passthrough *st = calloc(1, sizeof *st);
     if (!st)
         return NULL;
@@ -319,7 +319,6 @@ static int handle_end_map(void *ctx) {
         // we push to queue
         deque8_push(cur->queue, json);
 
-        // free(cur->queue.handle);
         yyjson_doc_free(final);
         cur->path = cur->path_parent;
     }
@@ -475,10 +474,7 @@ static ssize_t json_fread(void *__cookie, char *buf, size_t size)
     return out;
 }
 
-jsonpath resource = { .key = String("resource"), .is_array = false, .next = NULL };
-jsonpath entry = { .key = String("entry"), .is_array = true, .next = &resource };
-
-static void *json_init(void) {
+static void *json_init(void *__path) {
     struct json *jc = calloc(1, sizeof *jc);
     if (!jc)
         return NULL;
@@ -498,7 +494,7 @@ static void *json_init(void) {
     deque8_init(jc->readable.queue);
 
     /* body path */
-    jc->writable.path = &entry; 
+    jc->writable.path = __path;
     jc->writable.path_parent = NULL;
 
     /* yajl parser */
@@ -551,11 +547,11 @@ const cookie_t COOKIE_JSON = {
     .destroy = json_destroy
 };
 
-FILE *cookie(const struct cookie *backend) {
+FILE *cookie(const struct cookie *backend, void *ctx) {
     if (!backend || !backend->init)
         return NULL;
 
-    void *state = backend->init();
+    void *state = backend->init(ctx);
     if (!state)
         return NULL;
 

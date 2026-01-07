@@ -11,13 +11,13 @@
 typedef struct cookie cookie_t;
 
 /**
- * Initialize a custom io stream with the provided callbacks in IO.
+ * Initialize a custom io stream with the provided callbacks in IO with nullable CTX.
  *
  * ...
  *
  * 내가 만든 쿠키
  */
-FILE *cookie(const struct cookie *backend);
+FILE *cookie(const struct cookie *backend, void *ctx);
 
 /**
  * The trivial cookie implementation that just forwards written bytes into a readable end.
