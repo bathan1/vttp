@@ -257,3 +257,4 @@ bool __queue_insert(struct queue *q, struct str s);
         struct str: __str_split \
     )((iter), (match), (f))
 
+char *dsnprintf(size_t *n, const char *fmt, ...);

@@ -31,6 +31,38 @@ struct queue {
     size_t cap;
 };
 
+char *dsnprintf(size_t *n, const char *fmt, ...) {
+    if (!n)
+        return NULL;
+    va_list ap, ap2;
+
+    // --- First pass: measure ---
+    va_start(ap, fmt);
+    va_copy(ap2, ap);
+
+    int needed = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+
+    if (needed < 0) {
+        errno = EINVAL;
+        va_end(ap2);
+        return NULL;
+    }
+
+    size_t len = min(needed, *n);
+    char *p = (char *) calloc(1, len + 1);
+    if (!p) {
+        va_end(ap2);
+        return NULL;
+    }
+
+    vsnprintf(p, len + 1, fmt, ap2);
+
+    *n = len;
+    va_end(ap2);
+    return p;
+}
+
 struct str str(const char *fmt, ...) {
     struct str out = {0};
     va_list ap, ap2;

@@ -472,8 +472,7 @@ static int xFilter(sqlite3_vtab_cursor *_cur,
         return SQLITE_ERROR;
     }
 
-
-    char *url  = resolve_hidden_col_text(vtab, ICOL_URL, argc, argv);
+    char *url = resolve_hidden_col_text(vtab, ICOL_URL, argc, argv);
     // char *headers = resolve_hidden_col_text(vtab, ICOL_HEADERS, argc, argv);
     char *body = resolve_hidden_col_text(vtab, ICOL_BODY, argc, argv);
 

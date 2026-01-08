@@ -19,7 +19,7 @@ struct url {
      *
      * {@link https://developer.mozilla.org/en-US/docs/Web/API/URL/host}
      */
-    struct str host;
+    char *host;
 
     /**
      * @brief A string containing the domain of the URL.
@@ -34,7 +34,7 @@ struct url {
      *
      * {@link https://developer.mozilla.org/en-US/docs/Web/API/URL/pathname}
      */
-    struct str pathname;
+    char *pathname;
 
     /**
      * @brief A string containing the port number of the URL.

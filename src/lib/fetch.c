@@ -22,10 +22,10 @@ void url_free(struct url *url) {
         return;
     }
 
-    done(url->host);
+    free(url->host);
     done(url->protocol);
     done(url->hostname);
-    done(url->pathname);
+    free(url->pathname);
     done(url->port);
 }
 
@@ -77,6 +77,31 @@ static int set_nonblocking(int fd) {
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0;
 }
 
+#define HTTP_MAX_REQUEST (16 * 1024)
+static char *http_request(const char *method, const char *pathname, 
+                          const char *host, size_t *request_len)
+{
+    char *request = calloc(HTTP_MAX_REQUEST, sizeof(char));
+    int len = snprintf(
+        request,
+        HTTP_MAX_REQUEST,
+        "%s %s HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "User-Agent: vttp/1.0\r\n"
+        "Accept: */*\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        method,
+        pathname,
+        host
+    );
+
+    if (len <= 0) { /* TODO: Handle ERROR */ }
+    if (request_len)
+        *request_len = len;
+    return request;
+}
+
 int use_fetch(int fds[4], struct dispatch *dispatch) {
     char *protocol = hd(dispatch->url.protocol);
     bool is_tls = strncmp(protocol, "https:", 6) == 0;
@@ -98,29 +123,16 @@ int use_fetch(int fds[4], struct dispatch *dispatch) {
         dispatch_free(dispatch);
         return -1;
     }
-    struct str GET = str(
-        "GET %s HTTP/1.1\r\n"
-        "Host: %s\r\n"
-        "User-Agent: vttp/1.0\r\n"
-        "Accept: */*\r\n"
-        "Connection: close\r\n"
-        "\r\n",
-        hd(dispatch->url.pathname),
-        hd(dispatch->url.host)
-    );
-    if (!hd(GET)) {
+
+    size_t request_len = 0;
+    char *GET = http_request("GET", dispatch->url.pathname, dispatch->url.host, &request_len);
+    if (!GET || request_len <= 0) { /* HANDLEME */ }
+
+    if (tcp_send(dispatch->sockfd, GET, request_len, is_tls ? *ssl : NULL) < 0) {
         close(dispatch->sockfd);
         dispatch_free(dispatch);
         return -1;
     }
-
-    if (tcp_send(dispatch->sockfd, hd(GET), len(GET), is_tls ? *ssl : NULL) < 0) {
-        close(dispatch->sockfd);
-        dispatch_free(dispatch);
-        return -1;
-    }
-
-    done(GET);
 
     int sv[2] = {0};
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
@@ -272,9 +284,14 @@ static struct url *url_of_string(const char *url) {
     curl_url_get(u, CURLUPART_PATH, &path_c, 0);
     curl_url_get(u, CURLUPART_PORT, &port_c, CURLU_DEFAULT_PORT);
 
-    URL->host = str("%s:%s", host_c, port_c);
+    size_t host_len = strlen(host_c) + 1 + strlen(port_c);
+    URL->host = dsnprintf(&host_len, "%s:%s", host_c, port_c);
+
     URL->hostname = str("%s", host_c);
-    URL->pathname = str("%s", path_c);
+
+    size_t pathname_len = strlen(host_c);
+    URL->pathname = dsnprintf(&pathname_len, "%s", path_c);
+
     URL->port = str("%s", port_c);
     URL->protocol = str("%s", is_tls ? "https:" : "http:");
 

@@ -7,4 +7,5 @@ CREATE VIRTUAL TABLE patients USING vttp (
     gender TEXT
 );
 
-SELECT * FROM patients WHERE url = 'https://r4.smarthealthit.org/Patient' and body = '$.entry[*].resource';
+SELECT * FROM patients 
+WHERE url = 'https://r4.smarthealthit.org/Patient' and body = '$.entry[*].resource';
