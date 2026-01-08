@@ -11,9 +11,8 @@
 FILE *fetch(const char *url, const char *init[4]) {
     int fds[4] = {0};
     struct dispatch *dispatch = fetch_socket(url, init);
-    if (!dispatch) {
-        return perror_rc(NULL, "fetch_socket()", 0);
-    }
+    if (!dispatch)
+        return NULL;
     char *hostname = strdup(dispatch->url.hostname.hd);
     int rc = use_fetch(fds, dispatch);
     if (rc != 0) {
@@ -50,7 +49,8 @@ FILE *fetch(const char *url, const char *init[4]) {
 
     FILE *fetchfile = fdopen(appfd, "r");
     if (!fetchfile) {
-        return perror_rc(NULL, "fdopen()", close(appfd));
+        close(appfd);
+        return NULL;
     }
     dispatch_free(dispatch);
     return fetchfile;
