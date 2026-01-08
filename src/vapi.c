@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-FILE *fetch(const char *url, const char *init[4]) {
+FILE *fetch(const char *url, const char *init[4], FILE *response_cookie) {
     int fds[4] = {0};
     struct dispatch *dispatch = fetch_socket(url, init);
     if (!dispatch)
@@ -38,7 +38,7 @@ FILE *fetch(const char *url, const char *init[4]) {
     fs->reading_chunk_size = true;
     fs->chunk_line_len = 0;
 
-    fs->stream = cookie(&COOKIE_JSON, NULL);
+    fs->stream = response_cookie;
 
     fs->http_done = false;
 

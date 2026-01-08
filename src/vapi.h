@@ -33,4 +33,4 @@
  * ### Typicode API Example
  * @snippet fetch_print.c fetch basic usage
  */
-FILE *fetch(const char *url, const char *init[4]);
+FILE *fetch(const char *url, const char *init[4], FILE *response_cookie);

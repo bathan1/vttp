@@ -1,4 +1,5 @@
 // Copyright 2025 Nathanael Oh. All Rights Reserved.
+#include "lib/cookie.h"
 #include <sqlite3ext.h>
 SQLITE_EXTENSION_INIT1
 
@@ -476,7 +477,9 @@ static int xFilter(sqlite3_vtab_cursor *_cur,
     // char *headers = resolve_hidden_col_text(vtab, ICOL_HEADERS, argc, argv);
     char *body = resolve_hidden_col_text(vtab, ICOL_BODY, argc, argv);
 
-    cur->stream = fetch(url, (const char *[]){0});
+
+    FILE *json_response = cookie(&COOKIE_JSON, NULL);
+    cur->stream = fetch(url, (const char *[]){0}, json_response);
 
     char *errmsg = NULL;
     cur->next_doc = read_next_json_object(cur->stream, &errmsg);
