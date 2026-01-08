@@ -55,33 +55,64 @@ static int resolve_column_index(struct str *tokens, size_t tokens_len, size_t cu
     return current_index;
 }
 
+const struct column_def HIDDEN_URL = {
+    .name = STR("url"),
+    .typename = STR("text"),
+    .default_value = STR(""),
+    .generated_always_as = NULL,
+    .generated_always_as_len = 0
+};
+
+const struct column_def HIDDEN_HEADERS = {
+    .name = STR("headers"),
+    .typename = STR("text"),
+    .default_value = STR(""),
+    .generated_always_as = NULL,
+    .generated_always_as_len = 0
+};
+
+const struct column_def HIDDEN_BODY = {
+    .name = STR("body"),
+    .typename = STR("text"),
+    .default_value = STR(""),
+    .generated_always_as = NULL,
+    .generated_always_as_len = 0
+};
+
+const struct column_def HIDDEN_COLUMNS[] = {
+    HIDDEN_URL,
+    HIDDEN_HEADERS,
+    HIDDEN_BODY
+};
+
 // Write out hidden column with code INDEX to COLUMNS
 // if COLUMNS[INDEX] == NULL.
 // 0 on success, 1 on fail with \c errno set
 static int hidden_column(int column_id, struct column_def **columns) {
-    assert(columns && "COLUMNS can't be NULL");
+    assert(columns && *columns && "COLUMNS can't be NULL");
     if (columns[column_id] != NULL) {
         errno = EEXIST;
         return 1;
     }
+    columns[column_id] = &HIDDEN_COLUMNS[column_id];
 
-    columns[column_id] = calloc(1, sizeof(struct column_def));
-    if (!columns[column_id]) // ENOMEM
-        return 1;
-    char hidden_column_name[8] = {0}; // at most can be "headers"
-    switch (column_id) {
-        case COL_URL:
-            memcpy(hidden_column_name, "url", 3);
-            break;
-        case COL_HEADERS:
-            memcpy(hidden_column_name, "headers", 7);
-            break;
-        case COL_BODY:
-            memcpy(hidden_column_name, "body", 4);
-            break;
-    }
-    columns[column_id]->name = str(hidden_column_name);
-    columns[column_id]->typename = str("text");
+    // columns[column_id] = calloc(1, sizeof(struct column_def));
+    // if (!columns[column_id]) // ENOMEM
+    //     return 1;
+    // char hidden_column_name[8] = {0}; // at most can be "headers"
+    // switch (column_id) {
+    //     case COL_URL:
+    //         memcpy(hidden_column_name, "url", 3);
+    //         break;
+    //     case COL_HEADERS:
+    //         memcpy(hidden_column_name, "headers", 7);
+    //         break;
+    //     case COL_BODY:
+    //         memcpy(hidden_column_name, "body", 4);
+    //         break;
+    // }
+    // columns[column_id]->name = str(hidden_column_name);
+    // columns[column_id]->typename = str("text");
     return 0;
 }
 

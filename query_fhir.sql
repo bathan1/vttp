@@ -8,4 +8,4 @@ CREATE VIRTUAL TABLE patients USING vttp (
     gender TEXT
 );
 
-SELECT * FROM patients;
+SELECT * FROM patients WHERE body = '$.entry[*].resource';
