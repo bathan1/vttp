@@ -85,19 +85,6 @@ const struct column_def HIDDEN_COLUMNS[] = {
     HIDDEN_BODY
 };
 
-// Write out hidden column with code INDEX to COLUMNS
-// if COLUMNS[INDEX] == NULL.
-// 0 on success, 1 on fail with \c errno set
-static int hidden_column(int column_id, struct column_def **columns) {
-    assert(columns && *columns && "COLUMNS can't be NULL");
-    if (columns[column_id] != NULL) {
-        errno = EEXIST;
-        return 1;
-    }
-    columns[column_id] = &HIDDEN_COLUMNS[column_id];
-    return 0;
-}
-
 static bool isnotdquo(int c, uint _i) {return c != '\"';}
 static bool isnotsquo(int c, uint _i) {return c != '\'';}
 
@@ -137,27 +124,9 @@ static bool is_with_generated_always_as(struct str *tokens, size_t num_tokens) {
 struct column_def *resolve_hidden_columns(int argc, const char *const *argv) {
     struct column_def *cols = calloc(MAX_COL_COUNT, sizeof(struct column_def));
     // static declarations
-    cols[0] = (struct column_def) {
-        .name = str("url"),
-        .typename = str("text"),
-        .default_value = str(""),
-        .generated_always_as = NULL,
-        .generated_always_as_len = 0
-    };
-    cols[1] = (struct column_def) {
-        .name = str("headers"),
-        .typename = str("text"),
-        .default_value = str(""),
-        .generated_always_as = NULL,
-        .generated_always_as_len = 0
-    };
-    cols[2] = (struct column_def) {
-        .name = str("body"),
-        .typename = str("text"),
-        .default_value = str("", 0),
-        .generated_always_as = NULL,
-        .generated_always_as_len = 0
-    };
+    cols[0] = HIDDEN_URL;
+    cols[1] = HIDDEN_HEADERS;
+    cols[2] = HIDDEN_BODY;
 
     for (int i = FETCH_ARGS_OFFSET; i < argc; i++) {
         size_t num_tokens = 0;
@@ -273,9 +242,8 @@ struct column_def *parse_column_defs(int argc, const char *const *argv,
 
     }
 
-    if (num_columns) {
+    if (num_columns)
         *num_columns = n_columns;
-    }
 
     return cols;
 }
