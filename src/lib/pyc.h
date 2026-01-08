@@ -57,7 +57,7 @@ size_t __str_len(struct str s);
 /**
  * @brief Get the pointer to the backing byte buffer in S. This is optional for callers because you can just access s.val directly.
  */
-const char *__str_get(struct str s);
+char *__str_get(struct str s);
 
 /**
  * @brief Cleanup *dynamically* allocated string S.
