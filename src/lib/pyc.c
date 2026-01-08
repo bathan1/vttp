@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 const struct str STR_EMPTY = {
-    .val = "",
+    .val = NULL,
     .length = 0
 };
 

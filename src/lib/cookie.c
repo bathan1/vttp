@@ -1,4 +1,4 @@
-#include "cfns.h"
+#include "debug.h"
 #include "pyc.h"
 
 #include <errno.h>
@@ -92,7 +92,7 @@ struct json_writable {
     list *path;
     list *path_parent;
     unsigned int current_depth;
-    struct deque8 *queue;
+    struct queue *queue;
 
     // JSON property names memory
     char **keys;
@@ -106,7 +106,7 @@ struct json_writable {
 };
 
 struct json_readable {
-    struct deque8 *queue;
+    struct queue *queue;
     char *current;
     size_t length;
     size_t offset;
@@ -317,8 +317,9 @@ static int handle_end_map(void *ctx) {
         cur->keys_size = 0;
 
         char *json = yyjson_write(final, cur->pp_flags, NULL);
+        struct str json_str = {.val=json,.length=strlen(json)};
         // we push to queue
-        deque8_push(cur->queue, json);
+        insert(cur->queue, json_str);
 
         yyjson_doc_free(final);
         cur->path = cur->path_parent;
@@ -354,18 +355,19 @@ static yajl_callbacks callbacks = {
 
 static struct json_writable *use_state(void) {
     struct json_writable *st = calloc(1, sizeof(struct json_writable));
-    if (!st) return perror_rc(NULL, "calloc()", 0);
+    if (!st)
+        return enomem(NULL);
 
     st->keys_cap = 1 << 8;     // 256
     st->keys = calloc(st->keys_cap, sizeof(char *));
     if (!st->keys) {
-        return perror_rc(NULL, "calloc()", free(st));
+        free(st);
+        return enomem(NULL);
     }
 
     // IMPORTANT: do NOT allocate st->queue here.
     // It must be set by stream_writable() to point to caller's queue.
     st->queue = NULL;
-
     return st;
 }
 
@@ -416,7 +418,7 @@ static int json_fclose(void *__cookie) {
     if (!cookie->readable.queue) { 
         rc += 1;
     }
-    deque8_free(cookie->readable.queue);
+    done(cookie->readable.queue);
 
     free(cookie);
     return 0;
@@ -426,9 +428,8 @@ static ssize_t json_fread(void *__cookie, char *buf, size_t size)
 {
     json_t *cookie = __cookie;
 
-    if (size == 0) {
+    if (size == 0)
         return 0;
-    }
 
     size_t out = 0;
 
@@ -442,11 +443,12 @@ static ssize_t json_fread(void *__cookie, char *buf, size_t size)
 
         /* Load next JSON object if needed */
         if (!cookie->readable.current) {
-            cookie->readable.current = deque8_pop(cookie->readable.queue);
-            if (!cookie->readable.current)
-                return out;  // EOF if nothing written
+            struct str front = next(cookie->readable.queue);
+            if (!front.val)
+                return out;
+            cookie->readable.current = front.val;
 
-            cookie->readable.length = strlen(cookie->readable.current);
+            cookie->readable.length = len(front);
             cookie->readable.offset = 0;
         }
 
@@ -462,7 +464,9 @@ static ssize_t json_fread(void *__cookie, char *buf, size_t size)
         out += to_copy;
 
         if (cookie->readable.offset == cookie->readable.length) {
-            free(cookie->readable.current);
+            if (cookie->readable.current)
+                free(cookie->readable.current);
+
             cookie->readable.current = NULL;
             cookie->readable.emit_newline = true;
         }
@@ -488,11 +492,9 @@ static void *json_make(void *__path) {
 
     /* queue */
     jc->writable.queue = jc->readable.queue =
-        calloc(1, sizeof *jc->readable.queue);
+        calloc(1, sizeof(struct queue *));
     if (!jc->readable.queue)
         goto fail;
-
-    deque8_init(jc->readable.queue);
 
     /* body path */
     jc->writable.path = __path;
@@ -508,7 +510,7 @@ static void *json_make(void *__path) {
 
 fail:
     if (jc->writable.parser) yajl_free(jc->writable.parser);
-    if (jc->readable.queue) deque8_free(jc->readable.queue);
+    if (jc->readable.queue) done(jc->readable.queue);
     free(jc->writable.keys);
     free(jc);
     return NULL;
@@ -532,7 +534,7 @@ static void json_destroy(void *state) {
 
     /* queue */
     if (jc->readable.queue)
-        deque8_free(jc->readable.queue);
+        done(jc->readable.queue);
 
     free(jc);
 }

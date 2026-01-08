@@ -163,10 +163,4 @@ char *deque8_pop(struct deque8 *deque);
 #define perror_rc(__rc, __tag, ...)                              \
     (perror(__tag), __VA_ARGS__, (__rc))
 
-#define printf_err(__rc, ...) \
-    (fprintf(stderr, __VA_ARGS__), (__rc))
-
-#define enomem(__rc) \
-    (printf_err(__rc, "out of memory"))
-
 #define String(__hd) ((struct string){.hd=__hd,.length=sizeof(__hd)-1})
