@@ -6,7 +6,6 @@
  */
 #pragma once
 #include <stdio.h>
-#include "cfns.h"
 
 struct cookie;
 

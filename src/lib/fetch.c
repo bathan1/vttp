@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include "debug.h"
 #include "tcp.h"
 #include "fetch.h"
 #include "cookie.h"
@@ -43,22 +44,24 @@ void dispatch_free(struct dispatch *dispatch) {
 static struct url *url_of_string(const char *url);
 struct dispatch *fetch_socket(const char *url, const char *init[4]) {
     struct dispatch *disp = calloc(1, sizeof(struct dispatch));
-    if (!disp) {
-        return perror_rc(NULL, "calloc()", 0);
-    }
+    if (!disp)
+        return enomem(NULL);
 
     struct url *URL = url_of_string(url);
     if (!URL) {
-        return perror_rc(NULL, "url_of_string()", free(disp));
+        free(disp);
+        return NULL;
     }
     disp->url = *URL;
     if (tcp_getaddrinfo(disp->url.hostname.hd, disp->url.port.hd, &disp->addrinfo)) {
-        return perror_rc(NULL, "tcp_getaddrinfo()", dispatch_free(disp));
+        dispatch_free(disp);
+        return NULL;
     }
 
     disp->sockfd = tcp_socket(disp->addrinfo);
     if (disp->sockfd < 0) {
-        return perror_rc(NULL, "tcp_socket()", dispatch_free(disp));
+        dispatch_free(disp);
+        return NULL;
     }
     // just free the head, we need to keep the values alive
     // in dispatch
@@ -78,18 +81,20 @@ int use_fetch(int fds[4], struct dispatch *dispatch) {
     const char *hostname = is_tls ? dispatch->url.hostname.hd : NULL;
     if (tcp_connect(
         dispatch->sockfd, dispatch->addrinfo->ai_addr, dispatch->addrinfo->ai_addrlen,
-        ssl, ctx, hostname) < 0) {
-        return perror_rc(-1, "tcp_connect()",
-                         close(dispatch->sockfd),
-                         dispatch_free(dispatch)
-                         );
+        ssl, ctx, hostname) < 0)
+    {
+        close(dispatch->sockfd);
+        dispatch_free(dispatch);
+        return -1;
     }
 
     // make recv() nonblocking
     if (set_nonblocking(dispatch->sockfd) < 0) {
-        return perror_rc(-1, "set_nonblocking()", close(dispatch->sockfd), dispatch_free(dispatch));
+        close(dispatch->sockfd);
+        dispatch_free(dispatch);
+        return -1;
     }
-    struct string GET = dynamic(
+    struct str GET = str(
         "GET %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "User-Agent: vttp/1.0\r\n"
@@ -100,11 +105,15 @@ int use_fetch(int fds[4], struct dispatch *dispatch) {
         dispatch->url.host.hd
     );
     if (!GET.hd) {
-        return perror_rc(-1, "dynamic()", close(dispatch->sockfd), dispatch_free(dispatch));
+        close(dispatch->sockfd);
+        dispatch_free(dispatch);
+        return -1;
     }
 
     if (tcp_send(dispatch->sockfd, GET.hd, GET.length, is_tls ? *ssl : NULL) < 0) {
-        return perror_rc(-1, "ttcp_send()", GET.hd, close(dispatch->sockfd), dispatch_free(dispatch));
+        close(dispatch->sockfd);
+        dispatch_free(dispatch);
+        return -1;
     }
 
     free(GET.hd);
@@ -119,17 +128,29 @@ int use_fetch(int fds[4], struct dispatch *dispatch) {
     int appfd = sv[0];
     int fetchfd = sv[1];
     if (set_nonblocking(fetchfd)) {
-        return perror_rc(-1, "set_nonblocking()", close(appfd), close(fetchfd), close(dispatch->sockfd), dispatch_free(dispatch));
-
+        close(appfd);
+        close(fetchfd);
+        close(dispatch->sockfd);
+        dispatch_free(dispatch);
+        return -1;
     }
 
     int pollfd = epoll_create1(0);
     if (pollfd < 0) {
-        return perror_rc(-1, "epoll_create1()", close(appfd), close(fetchfd), close(dispatch->sockfd), dispatch_free(dispatch));
+        close(appfd);
+        close(fetchfd);
+        close(dispatch->sockfd);
+        dispatch_free(dispatch);
+        return -1;
     }
     struct epoll_event ev = { .events=EPOLLIN, .data.fd=dispatch->sockfd };
     if (epoll_ctl(pollfd, EPOLL_CTL_ADD, dispatch->sockfd, &ev)) {
-        return perror_rc(-1, "epoll_create1()", close(pollfd), close(appfd), close(fetchfd), close(dispatch->sockfd), dispatch_free(dispatch));
+        close(pollfd);
+        close(appfd);
+        close(fetchfd);
+        close(dispatch->sockfd);
+        dispatch_free(dispatch);
+        return -1;
     }
 
     fds[0] = dispatch->sockfd;
@@ -247,11 +268,11 @@ static struct url *url_of_string(const char *url) {
     curl_url_get(u, CURLUPART_PATH, &path_c, 0);
     curl_url_get(u, CURLUPART_PORT, &port_c, CURLU_DEFAULT_PORT);
 
-    URL->host = dynamic("%s:%s", host_c, port_c);
-    URL->hostname = dynamic("%s", host_c);
-    URL->pathname = dynamic("%s", path_c);
-    URL->port = dynamic("%s", port_c);
-    URL->protocol = dynamic("%s", is_tls ? "https:" : "http:");
+    URL->host = str("%s:%s", host_c, port_c);
+    URL->hostname = str("%s", host_c);
+    URL->pathname = str("%s", path_c);
+    URL->port = str("%s", port_c);
+    URL->protocol = str("%s", is_tls ? "https:" : "http:");
 
     curl_free(host_c);
     curl_free(path_c);

@@ -379,7 +379,6 @@ static int xColumn(sqlite3_vtab_cursor *pcursor,
     yyjson_val *val = yyjson_doc_get_root(cursor->next_doc);
 
     char *json = yyjson_val_write(val, YYJSON_WRITE_PRETTY, NULL);
-    printf("column name: %s %zu\n", def.name.hd, def.name.length);
 
     if (def.generated_always_as_len > 0) {
         val = follow_generated_path(
