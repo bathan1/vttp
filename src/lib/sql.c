@@ -2,7 +2,6 @@
 #include <asm-generic/errno-base.h>
 #include <assert.h>
 #include <ctype.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,9 +24,6 @@ enum {
     TOK_CST_GEN_VAL
 };
 
-
-enum { COL_URL = 0, COL_HEADERS, COL_BODY };
-
 static int resolve_column_index(struct str *tokens, size_t tokens_len, size_t current_index) {
     bool is_url_column = (
         tokens_len > 0 &&
@@ -49,7 +45,7 @@ static int resolve_column_index(struct str *tokens, size_t tokens_len, size_t cu
             return -1;
         }
 
-        return COL_URL;
+        return ICOL_URL;
     }
 
     return current_index;
@@ -247,3 +243,4 @@ struct column_def *parse_column_defs(int argc, const char *const *argv,
 
     return cols;
 }
+

@@ -2,10 +2,9 @@
 .load ./libvttp
 
 CREATE VIRTUAL TABLE patients USING vttp (
-    url TEXT DEFAULT 'https://r4.smarthealthit.org/Patient',
     "resourceType" TEXT,
     id INT,
     gender TEXT
 );
 
-SELECT * FROM patients WHERE body = '$.entry[*].resource';
+SELECT * FROM patients WHERE url = 'https://r4.smarthealthit.org/Patient' and body = '$.entry[*].resource';

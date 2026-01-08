@@ -20,12 +20,6 @@ SQLITE_EXTENSION_INIT1
 #include <string.h>
 #include <wchar.h>
 
-#define FETCH_URL 0
-#define FETCH_HEADERS 1
-#define FETCH_BODY 2
-
-/* For debug logs */
-
 yyjson_doc *read_next_json_object(FILE *stream, char **errmsg) {
     char *buf = NULL;
     size_t cap = 0;
@@ -68,6 +62,7 @@ typedef struct {
      */
     sqlite3_vtab base;
 
+
     /**
      * The #column_defs for this row
      */
@@ -75,6 +70,8 @@ typedef struct {
 
     /** Number of COLUMNS_DEFS in the allocated buffer. */
     size_t column_defs_count;
+
+    uint icol_to_arg_index[4];
 } Fetch;
 
 /// Cursor
@@ -182,14 +179,6 @@ static bool is_usable_eq_cst(struct sqlite3_index_constraint *cst, uint index) {
     );
 }
 
-static bool is_body_set_index_constraint(struct sqlite3_index_constraint *cst) {
-    return (
-        cst->iColumn == FETCH_BODY // column index
-        && cst->op == // was the operator '='?
-            SQLITE_INDEX_CONSTRAINT_EQ
-        && cst->usable
-    );
-}
 /* expected bitmask value of the index_info from xBestIndex */
 #define REQUIRED_BITS 0b01
 
@@ -199,26 +188,23 @@ static int check_plan_mask(struct sqlite3_index_info *index_info,
 {
     Fetch *vtab = (void *) pVtab;
     if ((index_info->idxNum & REQUIRED_BITS) == REQUIRED_BITS
-        || (vtab->column_defs[FETCH_URL].default_value.length > 0))
-    { // Then either a `where url = ...` or a default value was set (or both)
-        return SQLITE_OK;
-    }
+        || (vtab->column_defs[ICOL_URL].default_value.length > 0))
+        return SQLITE_OK; // Then either a `where url = ...` or a default value was set (or both)
 
     bool is_url_eq_cst = false;
 
     for (int i = 0; i < index_info->nConstraint; i++) {
         struct sqlite3_index_constraint *cst = &index_info->aConstraint[i];
 
-        if (cst->iColumn == FETCH_URL) {
+        if (cst->iColumn == ICOL_URL) {
             is_url_eq_cst = true; // User passed "url" constraint but it somehow failed...
-            if (!cst->usable) {
+            if (!cst->usable)
                 return SQLITE_CONSTRAINT;
-            }
         }
     }
 
     if (!is_url_eq_cst) {
-        if (vtab->column_defs[FETCH_URL].default_value.length < 1) {
+        if (vtab->column_defs[ICOL_URL].default_value.length < 1) {
             pVtab->zErrMsg = sqlite3_mprintf(
                 "(vttp) Missing `WHERE url = ...` (no default URL)."
             );
@@ -228,6 +214,7 @@ static int check_plan_mask(struct sqlite3_index_info *index_info,
 
     return SQLITE_ERROR;
 }
+#undef REQUIRED_BITS
 
 /**
  * Fetch vtab's sqlite_module->xBestIndex() callback
@@ -246,16 +233,18 @@ static int xBestIndex(sqlite3_vtab *pVTab, sqlite3_index_info *pIdxInfo) {
         struct sqlite3_index_constraint_usage *usage =
             &pIdxInfo->aConstraintUsage[i];
 
-        if (is_usable_eq_cst(cst, FETCH_URL)) {
+        if (is_usable_eq_cst(cst, ICOL_URL)) {
+            vtab->icol_to_arg_index[ICOL_URL] = argPos - 1;
             usage->omit = 1;
             usage->argvIndex = argPos++;
-            planMask |= 0b01;
+            planMask |= ICOL_BIT(ICOL_URL);
         } 
 
-        if (is_usable_eq_cst(cst, FETCH_BODY)) {
+        if (is_usable_eq_cst(cst, ICOL_BODY)) {
+            vtab->icol_to_arg_index[ICOL_BODY] = argPos - 1;
             usage->omit = 1;
             usage->argvIndex = argPos++;
-            planMask |= 0b0100;
+            planMask |= ICOL_BIT(ICOL_BODY);
         } 
     }
 
@@ -341,11 +330,11 @@ static void json_bool_result(
     struct column_def *def,
     yyjson_val *column_val
 ) {
-    if (strncmp(def->typename.hd, "int", 3) == 0 || strncmp(def->typename.hd, "float", 5) == 0) {
+    if (strncmp(hd(def->typename), "int", 3) == 0 
+        || strncmp(hd(def->typename), "float", 5) == 0)
         sqlite3_result_int(pctx, yyjson_get_bool(column_val));
-    } else {
+    else
         sqlite3_result_text(pctx, yyjson_get_bool(column_val) ? "true" : "false", -1, SQLITE_TRANSIENT);
-    }
 }
 
 static yyjson_val *follow_generated_path(
@@ -382,10 +371,8 @@ static int xColumn(sqlite3_vtab_cursor *pcursor,
         return SQLITE_ERROR;
     }
 
-    if (icol < 3) {
-        // Skip hidden column_defs
+    if (icol < 3) // Skip hidden column_defs
         return SQLITE_OK;
-    }
 
     struct column_def def = vtab->column_defs[icol];
 
@@ -453,34 +440,50 @@ static int xRowid(sqlite3_vtab_cursor *pcursor, sqlite3_int64 *prowid) {
     return SQLITE_OK;
 }
 
-static int xFilter(sqlite3_vtab_cursor *cur0,
+static inline char *
+resolve_hidden_col_text(
+    const Fetch *vtab,
+    uint icol,
+    int argc,
+    sqlite3_value **argv
+) {
+    int ai = vtab->icol_to_arg_index[icol];
+
+    if (ai >= 0 && ai < argc) {
+        return (char *) sqlite3_value_text(argv[ai]);
+    }
+
+    return hd(vtab->column_defs[icol].default_value);
+}
+
+static int xFilter(sqlite3_vtab_cursor *_cur,
                     int idxNum, const char *idxStr,
                     int argc, sqlite3_value **argv)
 {
-    Fetch *vtab = (Fetch*)cur0->pVtab;
-    fetch_cursor_t *Cur = (fetch_cursor_t*)cur0;
+    Fetch *vtab = (Fetch*)_cur->pVtab;
+    fetch_cursor_t *cur = (fetch_cursor_t*)_cur;
 
-    Cur->eof = 0, Cur->count = 0, Cur->next_doc = NULL;
+    cur->eof = 0, cur->count = 0, cur->next_doc = NULL;
 
     // Extract URL
-    if (argc == 0 && !vtab->column_defs[FETCH_URL].default_value.hd) {
-        cur0->pVtab->zErrMsg =
+    if (argc == 0 && !vtab->column_defs[ICOL_URL].default_value.hd) {
+        _cur->pVtab->zErrMsg =
             sqlite3_mprintf("(vttp) need at least 1 argument or default url");
         return SQLITE_ERROR;
     }
 
-    struct str default_url = vtab->column_defs[FETCH_URL].default_value;
-    const char *url = (argc > 0 && len(default_url) == 0)
-        ? (const char*) sqlite3_value_text(argv[0])
-        : hd(default_url);
 
-    Cur->stream = fetch(url, (const char *[]){0});
+    char *url  = resolve_hidden_col_text(vtab, ICOL_URL, argc, argv);
+    // char *headers = resolve_hidden_col_text(vtab, ICOL_HEADERS, argc, argv);
+    char *body = resolve_hidden_col_text(vtab, ICOL_BODY, argc, argv);
+
+    cur->stream = fetch(url, (const char *[]){0});
 
     char *errmsg = NULL;
-    Cur->next_doc = read_next_json_object(Cur->stream, &errmsg);
+    cur->next_doc = read_next_json_object(cur->stream, &errmsg);
 
-    if (!Cur->next_doc) {
-        cur0->pVtab->zErrMsg = errmsg;
+    if (!cur->next_doc) {
+        _cur->pVtab->zErrMsg = errmsg;
         return SQLITE_ERROR;
     }
 
