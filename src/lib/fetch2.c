@@ -1,3 +1,4 @@
+#include "debug.h"
 #include "http.h"
 #include "tcp.h"
 #include <netdb.h>
@@ -11,6 +12,9 @@ typedef struct fetch_init {
     int body;
 
     struct {
+        char status_text[HTTP_MAX_STATUS_TEXT_LENGTH + 1];
+        size_t status_text_len;
+
         char *headers;
         size_t *headers_len;
 
@@ -30,16 +34,19 @@ int fetch(const char *url, struct fetch_init init) {
 
     if (http_get_host(url, &hostname, &hostname_len, &port, &port_len) != 0) {
         // HANDLEME
+        return -1;
     }
 
     struct addrinfo *addrinfo = NULL;
     if (tcp_getaddrinfo(hostname, hostname_len, port, port_len, &addrinfo) != 0) {
         // HANDLEME
+        return -1;
     }
 
     int sockfd = tcp_socket(addrinfo);
     if (sockfd < 0) {
         // HANDLEME
+        return -1;
     }
 
     if (tcp_connect(
@@ -51,10 +58,12 @@ int fetch(const char *url, struct fetch_init init) {
         hostname) != 0)
     {
         // HANDLEME
+        return -1;
     }
 
     if (tcp_send(sockfd, request, request_len, NULL) < 0) {
         // HANDLEME
+        return -1;
     }
 
     char body[16 * 1024] = {0};
@@ -76,19 +85,17 @@ int fetch(const char *url, struct fetch_init init) {
                                init.response.headers, init.response.headers_len,
                                body, &body_size,
                                &response_len))
-        {
-            goto headers_done;
-        }
+            break;
     }
 
-headers_done:
-    printf("body_size = %zu\n", body_size);
-    printf("body:\n%.*s\n", (int) body_size, body);
+    return http_parse_status(init.response.headers, *init.response.headers_len,
+                             init.response.status_text, init.response.status_text_len);
 }
 
 int main() {
     char response_headers[4096] = {0};
     size_t hdrs_len = 0;
+
     int status = fetch("http://jsonplaceholder.typicode.com/todos", (fetch_init) {
         .method = "GET",
         .headers =
@@ -96,7 +103,7 @@ int main() {
             "Connection: close\r\n",
         .response = {
             .headers = response_headers,
-            .headers_len = &hdrs_len
+            .headers_len = &hdrs_len,
         }
     });
 }

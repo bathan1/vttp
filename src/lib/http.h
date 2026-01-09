@@ -2,6 +2,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+/**
+ * "Unavailable For Legal Reasons"
+ */
+#define HTTP_MAX_STATUS_TEXT_LENGTH 29
 #define HTTP_MAX_HEADERS_SIZE 4096
 
 /**
@@ -26,3 +30,6 @@ bool http_parse_headers(int *crlf_state, char *chunk, size_t chunk_size,
                        char *headers, size_t *headers_size,
                        char *body, size_t *body_size,
                        size_t *response_size);
+
+int http_parse_status(const char *headers, size_t headers_len, 
+                             char *status_text, size_t status_text_len);

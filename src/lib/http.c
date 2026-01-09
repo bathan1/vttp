@@ -250,3 +250,42 @@ bool http_parse_headers(int *crlf_state, char *chunk, size_t chunk_size,
     }
     return false;
 }
+
+int http_parse_status(const char *headers, size_t headers_len,
+                      char *status_text, size_t status_text_len)
+{
+    const char *p   = headers;
+    const char *end = headers + headers_len;
+
+    /* Find first space after HTTP/version */
+    while (p < end && *p != ' ')
+        p++;
+    if (p == end)
+        return -1;
+
+    p++; /* skip space */
+
+    /* Parse 3-digit status code */
+    int status = 0;
+    for (int i = 0; i < 3; i++) {
+        if (p >= end || *p < '0' || *p > '9')
+            return -1;
+        status = status * 10 + (*p++ - '0');
+    }
+
+    /* Optional space before reason phrase */
+    if (p < end && *p == ' ')
+        p++;
+
+    /* Extract reason phrase */
+    if (status_text && status_text_len > 0) {
+        size_t i = 0;
+        while (p < end && *p != '\r' && *p != '\n' && i + 1 < status_text_len) {
+            status_text[i++] = *p++;
+        }
+        status_text[i] = '\0';
+    }
+
+    return status;
+}
+
