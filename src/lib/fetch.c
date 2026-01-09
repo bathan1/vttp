@@ -77,30 +77,6 @@ static int set_nonblocking(int fd) {
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0;
 }
 
-#define HTTP_MAX_REQUEST (16 * 1024)
-static char *http_request(const char *method, const char *pathname, 
-                          const char *host, size_t *request_len)
-{
-    char *request = calloc(HTTP_MAX_REQUEST, sizeof(char));
-    int len = snprintf(
-        request,
-        HTTP_MAX_REQUEST,
-        "%s %s HTTP/1.1\r\n"
-        "Host: %s\r\n"
-        "User-Agent: vttp/1.0\r\n"
-        "Accept: */*\r\n"
-        "Connection: close\r\n"
-        "\r\n",
-        method,
-        pathname,
-        host
-    );
-
-    if (len <= 0) { /* TODO: Handle ERROR */ }
-    if (request_len)
-        *request_len = len;
-    return request;
-}
 
 int use_fetch(int fds[4], struct dispatch *dispatch) {
     char *protocol = hd(dispatch->url.protocol);
@@ -195,7 +171,8 @@ void *fetcher(void *arg) {
     while (!fs->http_done) {
         int n = epoll_wait(fs->ep, events, 4, -1);
         if (n < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                continue;
             break;
         }
 
@@ -204,11 +181,10 @@ void *fetcher(void *arg) {
             uint32_t ev = events[i].events;
 
             /* New data from the network */
-            if (!fs->headers_done) {
+            if (!fs->headers_done)
                 handle_http_headers(fs);
-            } else {
+            else
                 handle_http_body(fs);
-            }
 
         }
     }
@@ -246,13 +222,11 @@ static ssize_t read_full(int fd, void *buf, size_t len) {
     size_t off = 0;
     while (off < len) {
         ssize_t n = recv(fd, (char*)buf + off, len - off, 0);
-        if (n == 0) {
+        if (n == 0)
             return 0;
-        }
         if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
                 continue;
-            }
             return -1;               // real error
         }
         off += n;
@@ -348,9 +322,8 @@ static void handle_http_body_bytes(struct fetch_state *st,
                 char c = data[i++];
 
                 // Accumulate until CRLF
-                if (c == '\r') {
+                if (c == '\r')
                     continue; // skip
-                }
 
                 if (c == '\n') {
                     // End of chunk-size line
@@ -362,18 +335,16 @@ static void handle_http_body_bytes(struct fetch_state *st,
 
                     st->chunk_line_len = 0;
 
-                    if (st->current_chunk_size == 0) {
+                    if (st->current_chunk_size == 0)
                         st->http_done = true;
-                    } else {
+                    else
                         st->reading_chunk_size = false;
-                    }
 
                     continue;
                 }
 
-                if (st->chunk_line_len < sizeof(st->chunk_line) - 1) {
+                if (st->chunk_line_len < sizeof(st->chunk_line) - 1)
                     st->chunk_line[st->chunk_line_len++] = c;
-                }
 
                 continue;
             }
@@ -386,9 +357,8 @@ static void handle_http_body_bytes(struct fetch_state *st,
                 st->current_chunk_size -= written;
 
                 // If not enough bytes to finish payload, exit now
-                if (st->current_chunk_size > 0) {
+                if (st->current_chunk_size > 0)
                     return;
-                }
 
                 // Payload exactly finished expect CRLF next
                 // so switch to CRLF-skip mode
@@ -406,10 +376,8 @@ static void handle_http_body_bytes(struct fetch_state *st,
                 char c = data[i++];
                 if (c == '\r' || c == '\n') {
                     st->expecting_crlf--;
-                    if (st->expecting_crlf == 0) {
-                        // Now start the next chunk-size line
-                        st->reading_chunk_size = true;
-                    }
+                    if (st->expecting_crlf == 0)
+                        st->reading_chunk_size = true; // Now start the next chunk-size line
                 }
                 continue;
             }
@@ -428,11 +396,8 @@ static bool handle_http_headers(struct fetch_state *st) {
         ssize_t n = tcp_recv(st->netfd, buf, sizeof(buf), st->ssl);
         if (n > 0) {
             // Append to header buffer
-            if (st->header_len + n > sizeof(st->header_buf)) {
-                // headers too big
-                // you can error out or realloc
-                return false;
-            }
+            if (st->header_len + n > sizeof(st->header_buf))
+                return false; // headers too big
 
             memcpy(st->header_buf + st->header_len, buf, n);
             st->header_len += n;
@@ -454,11 +419,9 @@ static bool handle_http_headers(struct fetch_state *st) {
                     size_t leftover = st->header_len - header_end;
 
                     // For next step (body), we feed leftover directly
-                    if (leftover > 0) {
-                        // feed to body parser immediately
+                    if (leftover > 0) // feed to body parser immediately
                         handle_http_body_bytes(st,
                                                st->header_buf + header_end, leftover);
-                    }
 
                     return true; // done with headers
                 }
@@ -466,20 +429,14 @@ static bool handle_http_headers(struct fetch_state *st) {
 
             // CONTINUE LOOP — maybe more header bytes available in nonblocking recv
             continue;
-        }
-
-        else if (n == 0) {
+        } else if (n == 0) {
             // Server closed unexpectedly before sending full headers
             st->http_done = true;
             return false;
-        }
-
-        else { // n < 0
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // No more data NOW — epoll will wake us again
-                return false;
-            }
-            // real error
+        } else { // n < 0
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                return false; // No more data NOW — epoll will wake us again
+            // HANDLEME: real error
             return false;
         }
     }
@@ -502,10 +459,8 @@ static void handle_http_body(struct fetch_state *st) {
     }
 
     // n < 0: check errno
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        // no data right now — epoll will tell us later
-        return;
-    }
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+        return; // no data right now — epoll will tell us later
 
     // real error
     st->http_done = true;
@@ -521,11 +476,9 @@ static bool flush_pending(struct fetch_state *st) {
         if (n > 0) {
             st->pending_off += (size_t)n;
             st->pending_len -= (size_t)n;
-        }
-        else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             return false; // still pending
-        }
-        else {
+        } else {
             // real error — stop producing
             st->http_done = true;
             return false;
@@ -553,18 +506,16 @@ static void flush_stream(struct fetch_state *st) {
                          MSG_NOSIGNAL);
 
         if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
                 return;
-            }
             st->http_done = true;
             return;
         }
 
         st->pending_off += n;
 
-        if (st->pending_off < st->pending_len) {
+        if (st->pending_off < st->pending_len)
             return;
-        }
 
         free(st->pending_buf);
         st->pending_buf = NULL;
@@ -614,3 +565,4 @@ static void flush_stream(struct fetch_state *st) {
         st->closed_outfd = true;
     }
 }
+

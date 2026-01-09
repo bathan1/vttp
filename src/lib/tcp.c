@@ -71,29 +71,44 @@ void tcp_tls_free(SSL *ssl, SSL_CTX *ctx) {
         SSL_shutdown(ssl);
         SSL_free(ssl);
     }
-    if (ctx) {
+    if (ctx)
         SSL_CTX_free(ctx);
-    }
 }
 
-int tcp_getaddrinfo(const char *hostname, const char *port,
-                    struct addrinfo **addr)
+#define MAX_HOSTNAME_LENGTH 255
+#define MAX_PORT_LENGTH 15
+int tcp_getaddrinfo(
+    const char *hostname,
+    size_t hostname_len,
+    const char *port,
+    size_t port_len,
+    struct addrinfo **addr)
 {
-    if (!hostname || !port || !addr) {
-        fprintf(stderr, "HOSTNAME, PORT, or ADDR is NULL\n");
+    if (!hostname || !port || !addr)
         return EINVAL;
-    }
+
+    char hbuf[MAX_HOSTNAME_LENGTH + 1];
+    char pbuf[MAX_PORT_LENGTH + 1];
+
+    if (hostname_len >= sizeof(hbuf) || port_len >= sizeof(pbuf))
+        return ENAMETOOLONG;
+
+    memcpy(hbuf, hostname, hostname_len);
+    hbuf[hostname_len] = '\0';
+
+    memcpy(pbuf, port, port_len);
+    pbuf[port_len] = '\0';
+
     struct addrinfo hints = {
-        .ai_family=AF_INET,
-        .ai_socktype=SOCK_STREAM
+        .ai_family   = AF_INET,
+        .ai_socktype = SOCK_STREAM,
+        .ai_flags    = AI_NUMERICSERV
     };
-    int rc = getaddrinfo(hostname, port, &hints, addr);
-    if (rc != 0) {
-        fprintf(stderr, "getaddrinfo(hostname=%s, port=%s, HINTS, ADDR): %s\n", hostname, port, gai_strerror(rc));
-        return rc;
-    }
-    return 0;
+
+    return getaddrinfo(hbuf, pbuf, &hints, addr);
 }
+#undef MAX_HOSTNAME_LENGTH
+#undef MAX_PORT_LENGTH 
 
 int tcp_socket(struct addrinfo *addrinfo) {
     int sockfd = socket(

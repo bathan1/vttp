@@ -17,7 +17,12 @@
  * @retval 22 EINVAL. At least one of HOSTNAME or PORT or ADDR is NULL.
  * @retval ANYTHING_ELSE Error. The return value of \c getaddrinfo() when non-zero.
  */
-int tcp_getaddrinfo(const char *hostname, const char *port, struct addrinfo **addr);
+int tcp_getaddrinfo(
+    const char *hostname,
+    size_t __hostname_len,
+    const char *port,
+    size_t __port_len,
+    struct addrinfo **addr);
 
 /**
  * @brief Open socket fd from ADDRINFO and return it.

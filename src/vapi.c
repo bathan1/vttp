@@ -1,4 +1,3 @@
-#include "lib/cookie.h"
 #include "lib/fetch.h"
 
 #include <asm-generic/errno-base.h>
