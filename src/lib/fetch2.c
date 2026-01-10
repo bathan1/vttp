@@ -25,7 +25,7 @@ typedef struct request_init {
         char *headers;
         size_t *headers_len;
 
-        int body;
+        int *body;
     } response;
 } fetch_init;
 
@@ -106,13 +106,12 @@ int fetch(const char *url, struct request_init init) {
                            &response_len);
     }
 
-    int *body_fds = calloc(3, sizeof(int));
-    if (pipe(body_fds) == -1) {
+    if (pipe(init.response.body) == -1) {
         perror("pipe BODYFDS");
         return -1;
     }
     if (body_size > 0)
-        write(body_fds[1], body, body_size);
+        write(init.response.body[1], body, body_size);
 
     int epollfd = epoll_create1(0);
     if (epollfd == -1) {
@@ -125,17 +124,17 @@ int fetch(const char *url, struct request_init init) {
         perror("fcntl");
         return -1;
     }
-    if (fcntl(body_fds[0], F_SETFL, 
-              fcntl(body_fds[0], F_GETFL, 0) | O_NONBLOCK) < 0)
+    if (fcntl(init.response.body[0], F_SETFL, 
+              fcntl(init.response.body[0], F_GETFL, 0) | O_NONBLOCK) < 0)
     {
         perror("fcntl");
         return -1;
     }
-    body_fds[2] = sockfd;
+    init.response.body[2] = sockfd;
     //
     struct epoll_event ev = {
         .events = EPOLLIN,
-        .data.ptr = body_fds
+        .data.ptr = init.response.body
     };
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
         perror("epoll_ctl: sockfd");
@@ -198,10 +197,12 @@ int touppercase(const char *chunk, size_t n, char *next) {
 
 
 int main() {
+    int body[3] = {0};
     int epollfd = fetch("http://jsonplaceholder.typicode.com/todos", (fetch_init) {
         .method = "GET",
         .headers =
             "Connection: close\r\n",
+        .response.body = body
     });
     struct epoll_event events[MAX_EVENTS] = {0};
     int readfd = 0, writefd = 0, sockfd = 0;
