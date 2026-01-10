@@ -205,29 +205,20 @@ int main() {
         .response.body = body
     });
     struct epoll_event events[MAX_EVENTS] = {0};
-    int readfd = 0, writefd = 0, sockfd = 0;
     for (;;) {
         int nfds = epoll_wait(epollfd, events, 10, -1);
         if (nfds == -1) {
             perror("epoll_wait");
             return 1;
         }
-        if (!readfd || !writefd || !sockfd) {
-            for (int i = 0; i < nfds; i++) {
-                int *body = events[i].data.ptr;
-                readfd = body[0];
-                writefd = body[1];
-                sockfd = body[2];
-            }
-        }
-        if (pipe2(sockfd, writefd, touppercase) == 0) {
+        if (pipe2(body[2], body[1], touppercase) == 0) {
             break;
         }
     }
 
     int n = 0;
     char buf[4096] = {0};
-    while ((n = read(readfd, buf, 4096)) > 0) {
+    while ((n = read(body[0], buf, 4096)) > 0) {
         printf("%.*s", n, buf);
     }
     printf("final n = %d\n", n);
