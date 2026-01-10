@@ -1,16 +1,23 @@
 #include "debug.h"
 #include "http.h"
 #include "tcp.h"
+#include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <ctype.h>
 
-typedef struct fetch_init {
+#define MAX_EVENTS 10
+
+typedef struct request_init {
     const char *method;
     const char *headers;
     int body;
-
     struct {
         char status_text[HTTP_MAX_STATUS_TEXT_LENGTH + 1];
         size_t status_text_len;
@@ -19,11 +26,11 @@ typedef struct fetch_init {
         size_t *headers_len;
 
         int body;
-        size_t *body_len;
     } response;
 } fetch_init;
 
-int fetch(const char *url, struct fetch_init init) {
+#define BODY_FD_LEN 3
+int fetch(const char *url, struct request_init init) {
     size_t request_len = 0;
     char *request = http_request(init.method, url, init.headers, &request_len);
 
@@ -67,43 +74,161 @@ int fetch(const char *url, struct fetch_init init) {
     }
 
     char body[16 * 1024] = {0};
-    size_t body_size = 0;
+    size_t body_size = 0, headers_size = 0;
     char chunk[4096] = {0};
-    size_t headers_size = 0;
     int crlf_state = 0;
 
     size_t response_len = 0;
 
-    while (headers_size < 4096) {
+    char res_headers_own[4096] = {0};
+    char *res_headers = init.response.headers 
+        ? init.response.headers
+        : res_headers_own;
+
+    size_t res_headers_len_own = 0;
+    size_t *res_headers_len = init.response.headers_len 
+        ? init.response.headers_len
+        : &res_headers_len_own;
+
+    while (headers_size < 4096
+           && *res_headers_len < 4
+           && strncmp(res_headers, "\r\n\r\n", 4) != 0)
+    {
         size_t remaining = 4096 - headers_size;
         ssize_t n = tcp_recv(sockfd, chunk, remaining, NULL);
         if (n <= 0)
             break; // EOF or error
         response_len += n;
 
-        if (http_parse_headers(&crlf_state, chunk, n,
-                               init.response.headers, init.response.headers_len,
-                               body, &body_size,
-                               &response_len))
-            break;
+        http_parse_headers(&crlf_state, chunk, n,
+                           res_headers, res_headers_len,
+                           body, &body_size,
+                           &response_len);
     }
 
-    return http_parse_status(init.response.headers, *init.response.headers_len,
-                             init.response.status_text, init.response.status_text_len);
+    int *body_fds = calloc(3, sizeof(int));
+    if (pipe(body_fds) == -1) {
+        perror("pipe BODYFDS");
+        return -1;
+    }
+    if (body_size > 0)
+        write(body_fds[1], body, body_size);
+
+    int epollfd = epoll_create1(0);
+    if (epollfd == -1) {
+        perror("epoll_create1");
+        return -1;
+    }
+    if (fcntl(sockfd, F_SETFL, 
+              fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK) < 0)
+    {
+        perror("fcntl");
+        return -1;
+    }
+    if (fcntl(body_fds[0], F_SETFL, 
+              fcntl(body_fds[0], F_GETFL, 0) | O_NONBLOCK) < 0)
+    {
+        perror("fcntl");
+        return -1;
+    }
+    body_fds[2] = sockfd;
+    //
+    struct epoll_event ev = {
+        .events = EPOLLIN,
+        .data.ptr = body_fds
+    };
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
+        perror("epoll_ctl: sockfd");
+        return -1;
+    }
+
+    return epollfd;
+}
+#undef BODY_FD_LEN
+
+#define MAX_CHUNK 4096
+#define MAX_NEXT 5 * MAX_CHUNK
+int pipe2(int readable, int writable,
+           int f(const char *, size_t, char *))
+{
+    char chunk[4096] = {0};
+    char out[4096] = {0};
+    ssize_t n = read(readable, chunk, sizeof chunk);
+    if (n < 0) {
+        if (errno == EAGAIN) {}
+    }
+    if (n == 0) {
+        return n;
+    }
+
+    if (f) {
+        int rc = f(chunk, n, out);
+        ssize_t off = 0;
+        while (off < rc) {
+            ssize_t w = write(writable, out + off, rc - off);
+            if (w < 0) {
+                perror("write");
+                return w;
+            }
+            off += w;
+        }
+        return rc;
+    } 
+
+    ssize_t off = 0;
+    while (off < n) {
+        ssize_t w = write(writable, chunk + off, n - off);
+        if (w < 0) {
+            perror("write");
+            return w;
+        }
+        off += w;
+    }
+    return off;
+}
+#undef MAX_NEXT
+#undef MAX_CHUNK
+
+int touppercase(const char *chunk, size_t n, char *next) {
+    for (int i = 0; i < n; i++) {
+        next[i] = toupper(chunk[i]);
+    }
+    return n;
 }
 
-int main() {
-    char response_headers[4096] = {0};
-    size_t hdrs_len = 0;
 
-    int status = fetch("http://jsonplaceholder.typicode.com/todos", (fetch_init) {
+int main() {
+    int epollfd = fetch("http://jsonplaceholder.typicode.com/todos", (fetch_init) {
         .method = "GET",
         .headers =
-            "Accept: */*\r\n"
             "Connection: close\r\n",
-        .response = {
-            .headers = response_headers,
-            .headers_len = &hdrs_len,
-        }
     });
+    struct epoll_event events[MAX_EVENTS] = {0};
+    int readfd = 0, writefd = 0, sockfd = 0;
+    for (;;) {
+        int nfds = epoll_wait(epollfd, events, 10, -1);
+        if (nfds == -1) {
+            perror("epoll_wait");
+            return 1;
+        }
+        if (!readfd || !writefd || !sockfd) {
+            for (int i = 0; i < nfds; i++) {
+                int *body = events[i].data.ptr;
+                readfd = body[0];
+                writefd = body[1];
+                sockfd = body[2];
+            }
+        }
+        if (pipe2(sockfd, writefd, touppercase) == 0) {
+            break;
+        }
+    }
+
+    int n = 0;
+    char buf[4096] = {0};
+    while ((n = read(readfd, buf, 4096)) > 0) {
+        printf("%.*s", n, buf);
+    }
+    printf("final n = %d\n", n);
+    return 0;
 }

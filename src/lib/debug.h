@@ -35,3 +35,5 @@
 #define enomem(__rc) \
     (printf_err(__rc, "out of memory"))
 
+#define println(fmt, ...) \
+    printf(fmt "\n" __VA_OPT__(,) __VA_ARGS__)
